@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TeamLab Research Digest</title>
+<style>
+  /* Reset */
+  body, table, td, p, a, li { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+  table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+  img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    width: 100% !important;
+    background-color: #1a1a2e;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  .wrapper {
+    width: 100%;
+    background-color: #1a1a2e;
+    padding: 20px 0;
+  }
+
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+    background-color: #16213e;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #0f3460 0%, #533483 100%);
+    padding: 32px 40px;
+    text-align: center;
+  }
+
+  .header h1 {
+    margin: 0;
+    color: #e94560;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .header .subtitle {
+    margin: 8px 0 0 0;
+    color: #a8b2d1;
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  .header .logo-text {
+    font-size: 12px;
+    color: #8892b0;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 8px;
+  }
+
+  /* Body content */
+  .content {
+    padding: 32px 40px;
+  }
+
+  .intro {
+    color: #ccd6f6;
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0 0 24px 0;
+  }
+
+  /* Domain section */
+  .domain-section {
+    margin-bottom: 28px;
+    border: 1px solid #233554;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .domain-header {
+    background-color: #1a1a2e;
+    padding: 14px 20px;
+    border-bottom: 2px solid #e94560;
+  }
+
+  .domain-header h2 {
+    margin: 0;
+    color: #e94560;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  /* Trend card */
+  .trend-card {
+    padding: 18px 20px;
+    border-bottom: 1px solid #233554;
+  }
+
+  .trend-card:last-child {
+    border-bottom: none;
+  }
+
+  .trend-title {
+    margin: 0 0 8px 0;
+    color: #ccd6f6;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .trend-summary {
+    margin: 0 0 12px 0;
+    color: #8892b0;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .trend-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .relevance-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .relevance-high {
+    background-color: #e94560;
+  }
+
+  .relevance-medium {
+    background-color: #533483;
+  }
+
+  .relevance-low {
+    background-color: #0f3460;
+  }
+
+  .student-tags {
+    color: #a8b2d1;
+    font-size: 12px;
+  }
+
+  .student-tag {
+    display: inline-block;
+    background-color: #233554;
+    color: #64ffda;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    margin: 2px 2px;
+  }
+
+  .source-links {
+    margin-top: 8px;
+  }
+
+  .source-links a {
+    color: #64ffda;
+    font-size: 12px;
+    text-decoration: none;
+  }
+
+  .source-links a:hover {
+    text-decoration: underline;
+  }
+
+  /* Footer */
+  .footer {
+    background-color: #0a0a1a;
+    padding: 24px 40px;
+    text-align: center;
+  }
+
+  .footer p {
+    margin: 0;
+    color: #495670;
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
+  .footer a {
+    color: #8892b0;
+    text-decoration: underline;
+  }
+
+  .footer a:hover {
+    color: #ccd6f6;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid #233554;
+    margin: 20px 0;
+  }
+
+  /* Responsive */
+  @media only screen and (max-width: 640px) {
+    .container {
+      border-radius: 0;
+    }
+    .header, .content, .footer {
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+    .header h1 {
+      font-size: 22px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+<tr>
+<td align="center">
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-text">OpenClaw</div>
+    <h1>Research Trend Digest</h1>
+    <p class="subtitle">{{ instance_name }} &mdash; {{ generated_at }}</p>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+    <p class="intro">
+      Here are the latest research trends detected across your team's domains.
+      Each trend has been scored for relevance and matched to related team members.
+    </p>
+
+    {% for domain in domains %}
+    <div class="domain-section">
+      <div class="domain-header">
+        <h2>{{ domain.name }}</h2>
+      </div>
+
+      {% for trend in domain.trends %}
+      <div class="trend-card">
+        <h3 class="trend-title">{{ trend.title }}</h3>
+        <p class="trend-summary">{{ trend.summary }}</p>
+
+        <div class="trend-meta">
+          {% if trend.relevance_score >= 0.7 %}
+            <span class="relevance-badge relevance-high">Relevance: {{ "%.0f"|format(trend.relevance_score * 100) }}%</span>
+          {% elif trend.relevance_score >= 0.4 %}
+            <span class="relevance-badge relevance-medium">Relevance: {{ "%.0f"|format(trend.relevance_score * 100) }}%</span>
+          {% else %}
+            <span class="relevance-badge relevance-low">Relevance: {{ "%.0f"|format(trend.relevance_score * 100) }}%</span>
+          {% endif %}
+        </div>
+
+        {% if trend.matched_students %}
+        <div class="student-tags" style="margin-top: 8px;">
+          Related:
+          {% for student in trend.matched_students %}
+            <span class="student-tag">{{ student }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if trend.source_urls %}
+        <div class="source-links">
+          {% for url in trend.source_urls %}
+            <a href="{{ url }}" target="_blank">[source {{ loop.index }}]</a>{% if not loop.last %} &middot; {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+    </div>
+    {% endfor %}
+
+    {% if not domains %}
+    <p class="intro" style="text-align: center; color: #495670;">
+      No new trends to report. Check back tomorrow.
+    </p>
+    {% endif %}
+
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>
+      This digest was automatically generated by <strong>OpenClaw TeamLab</strong>.<br>
+      To change recipients or frequency, update the <em>digest_recipients</em> key in PI Config.<br>
+      <a href="#">Unsubscribe</a> &middot; <a href="#">Manage Preferences</a>
+    </p>
+  </div>
+
+</div>
+</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

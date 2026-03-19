@@ -1,0 +1,117 @@
+# =============================================================
+# OpenClaw TeamLab — .gitignore
+# =============================================================
+
+# ── 编辑器/工具备份文件 ─────────────────────────────────────
+*.bak
+*.orig
+*.swp
+
+# ── 环境变量（含密钥，不入库）─────────────────────────────────
+.env
+claw/.env
+claw/mcp-server/.env
+# 模板文件保留
+!.env.example
+
+
+# ── Python 编译产物 ───────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.pyo
+
+
+# ── Python 包构建 ─────────────────────────────────────────────
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+MANIFEST
+
+
+# ── 虚拟环境 ──────────────────────────────────────────────────
+.venv/
+venv/
+env/
+.python-version
+
+
+# ── 运行时日志与 PID ──────────────────────────────────────────
+data/logs/*.log
+data/logs/*.log.*
+data/pids/*.pid
+# 保留占位符（维持目录结构）
+!data/logs/.gitkeep
+!data/pids/.gitkeep
+
+
+# ── OpenClaw (claw/) 运行时状态 ───────────────────────────────
+# claw/config/ 目录为 OpenClaw 容器运行时生成的全量状态（凭证、会话、内存
+# 数据库、设备身份等），一律不入库，按需反选少量部署配置文件。
+
+# 整体排除运行时 config（凭证/会话/内存数据库/设备身份等均在此目录）
+# 用 ** 而非尾斜杠，这样 ! 反选子文件才会生效
+claw/config/**
+
+# 反选：定时任务定义（无敏感数据，属于项目配置，需入库）
+!claw/config/cron/
+!claw/config/cron/jobs.json
+
+# Workspace 运行时状态文件（agent 记忆、网络图等动态数据）
+claw/workspace/.openclaw/
+claw/workspace/network.json
+claw/workspace/memory/
+
+# ── csi/ 遗留目录（已迁移至 claw/，仅含 Docker volume 挂载残留）──
+csi/
+
+
+# ── 测试与覆盖率 ──────────────────────────────────────────────
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.tox/
+
+
+# ── IDE / 编辑器 ──────────────────────────────────────────────
+.idea/
+.vscode/
+.cursor/
+.claude/
+*.swp
+*.swo
+*~
+*.orig
+
+
+# ── macOS / Windows 系统文件 ──────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+
+# ── Docker 构建缓存（本地 build context 产物）────────────────
+*.tar
+*.tar.gz
+# 不忽略 docker-compose 和 Dockerfile 源文件
+!Dockerfile*
+!docker-compose*.yml
+
+
+# ── 类型检查 / Lint 缓存 ─────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+.pyright/
+pyrightconfig.json
+
+
+# ── Jupyter（若临时用于数据分析）────────────────────────────
+.ipynb_checkpoints/
+*.ipynb

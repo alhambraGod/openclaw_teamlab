@@ -1,0 +1,617 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+#  OpenClaw TeamLab — Service Manager (teamlab)
+#  Unified CLI for managing all system components.
+#
+#  Usage:
+#    teamlab start [-d|--daemon]     Start all services (foreground or daemon)
+#    teamlab stop                    Graceful shutdown of all services
+#    teamlab restart [-d|--daemon]   Stop then start
+#    teamlab status                  Show service health dashboard
+#    teamlab logs [component]        Tail live logs (gateway|scheduler|workers|all)
+#    teamlab init-db                 Initialize database tables + seed data
+#    teamlab doctor                  Diagnose common issues (ports, deps, DB)
+#    teamlab version                 Show version info
+#
+#  Inspired by: pm2, Dify, FastGPT, Ollama, Docker Compose
+# ═══════════════════════════════════════════════════════════════════════════
+set -euo pipefail
+
+# ── Constants ──
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTANCE_NAME="openclaw_teamlab"
+CONDA_ENV="claw_teamlab"
+
+PID_DIR="$HOME/.openclaw/pids"
+LOG_DIR="$HOME/.openclaw/logs"
+RUN_DIR="$HOME/.openclaw/run"
+
+GATEWAY_PORT="${GATEWAY_PORT:-10301}"
+SCHEDULER_PORT="${SCHEDULER_PORT:-10302}"
+WORKER_PORT_BASE="${WORKER_PORT_BASE:-10310}"
+WORKER_COUNT="${WORKER_COUNT:-3}"
+
+# ── Colors ──
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'  # No Color
+
+# ── Setup directories ──
+mkdir -p "$PID_DIR" "$LOG_DIR" "$RUN_DIR"
+
+# ── Helpers ──
+
+print_banner() {
+    echo -e "${BOLD}${CYAN}"
+    echo "  ╔═══════════════════════════════════════════╗"
+    echo "  ║     OpenClaw TeamLab  🧪  v0.1.0         ║"
+    echo "  ║     AI Research Team Management           ║"
+    echo "  ╚═══════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
+
+log_info()  { echo -e "  ${GREEN}✓${NC} $*"; }
+log_warn()  { echo -e "  ${YELLOW}⚠${NC} $*"; }
+log_error() { echo -e "  ${RED}✗${NC} $*"; }
+log_step()  { echo -e "  ${BLUE}▸${NC} $*"; }
+
+# ── Conda ──
+activate_conda() {
+    local conda_base=""
+    if [ -n "${CONDA_EXE:-}" ]; then
+        conda_base="$(dirname "$(dirname "$CONDA_EXE")")"
+    elif [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+        conda_base="$HOME/miniconda3"
+    elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+        conda_base="$HOME/anaconda3"
+    elif [ -f "/opt/homebrew/Caskroom/miniconda/base/etc/profile.d/conda.sh" ]; then
+        conda_base="/opt/homebrew/Caskroom/miniconda/base"
+    fi
+
+    if [ -n "$conda_base" ]; then
+        # shellcheck source=/dev/null
+        source "$conda_base/etc/profile.d/conda.sh"
+        conda activate "$CONDA_ENV" 2>/dev/null || conda activate base 2>/dev/null || true
+    fi
+}
+
+# ── PID Management ──
+write_pid()  { echo "$2" > "$PID_DIR/${1}.pid"; }
+remove_pid() { rm -f "$PID_DIR/${1}.pid"; }
+
+read_pid() {
+    local pidfile="$PID_DIR/${1}.pid"
+    if [ -f "$pidfile" ]; then
+        local pid
+        pid="$(cat "$pidfile" 2>/dev/null)"
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            echo "$pid"
+            return 0
+        fi
+        rm -f "$pidfile"
+    fi
+    return 1
+}
+
+is_running() { read_pid "$1" >/dev/null 2>&1; }
+
+check_port() {
+    local port="$1"
+    if lsof -i ":$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+        local pid
+        pid="$(lsof -i ":$port" -sTCP:LISTEN -t 2>/dev/null | head -1)"
+        return 1
+    fi
+    return 0
+}
+
+# Wait for a port to become available (service up)
+wait_for_port() {
+    local port="$1"
+    local name="$2"
+    local max_wait="${3:-15}"
+    local elapsed=0
+
+    while [ "$elapsed" -lt "$max_wait" ]; do
+        if lsof -i ":$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+    return 1
+}
+
+# ═══════════════════════════════════════════════════════════════════
+#  Commands
+# ═══════════════════════════════════════════════════════════════════
+
+cmd_start() {
+    local daemon=false
+    for arg in "$@"; do
+        case "$arg" in
+            -d|--daemon|--background) daemon=true ;;
+        esac
+    done
+
+    print_banner
+
+    # Pre-flight checks
+    echo -e "  ${DIM}Pre-flight checks...${NC}"
+
+    if ! check_port "$GATEWAY_PORT"; then
+        local blocker
+        blocker="$(lsof -i ":$GATEWAY_PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)"
+        log_error "Port $GATEWAY_PORT in use (pid=$blocker). Run: ${BOLD}teamlab stop${NC} or ${BOLD}kill $blocker${NC}"
+        exit 1
+    fi
+
+    if ! check_port "$SCHEDULER_PORT"; then
+        local blocker
+        blocker="$(lsof -i ":$SCHEDULER_PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)"
+        log_error "Port $SCHEDULER_PORT in use (pid=$blocker). Run: ${BOLD}teamlab stop${NC} or ${BOLD}kill $blocker${NC}"
+        exit 1
+    fi
+
+    log_info "Ports available ($GATEWAY_PORT, $SCHEDULER_PORT)"
+
+    # Kill stale workers from previous runs
+    pkill -f "workers.worker.*openclaw_teamlab" 2>/dev/null || true
+
+    # ── Start components ──
+    local python_bin
+    python_bin="$(which python)"
+
+    echo ""
+    echo -e "  ${BOLD}Starting services...${NC}"
+
+    # Gateway
+    log_step "Gateway (port $GATEWAY_PORT)"
+    local gw_log="$LOG_DIR/${INSTANCE_NAME}_gateway.log"
+    cd "$SCRIPT_DIR"
+    nohup "$python_bin" main.py web --port "$GATEWAY_PORT" >> "$gw_log" 2>&1 &
+    local gw_pid=$!
+    write_pid "gateway" "$gw_pid"
+    disown "$gw_pid" 2>/dev/null
+
+    if wait_for_port "$GATEWAY_PORT" "gateway" 10; then
+        log_info "Gateway ready (pid=$gw_pid)"
+    else
+        log_warn "Gateway starting slowly (pid=$gw_pid)"
+    fi
+
+    # Scheduler
+    log_step "Scheduler (port $SCHEDULER_PORT)"
+    local sched_log="$LOG_DIR/${INSTANCE_NAME}_scheduler.log"
+    nohup "$python_bin" main.py scheduler >> "$sched_log" 2>&1 &
+    local sched_pid=$!
+    write_pid "scheduler" "$sched_pid"
+    disown "$sched_pid" 2>/dev/null
+
+    if wait_for_port "$SCHEDULER_PORT" "scheduler" 8; then
+        log_info "Scheduler ready (pid=$sched_pid)"
+    else
+        log_warn "Scheduler starting slowly (pid=$sched_pid)"
+    fi
+
+    # Workers
+    log_step "Workers (×$WORKER_COUNT, ports $WORKER_PORT_BASE+)"
+    local worker_log="$LOG_DIR/${INSTANCE_NAME}_workers.log"
+    nohup "$python_bin" main.py workers --count "$WORKER_COUNT" >> "$worker_log" 2>&1 &
+    local worker_pid=$!
+    write_pid "workers" "$worker_pid"
+    disown "$worker_pid" 2>/dev/null
+    sleep 2
+
+    # Quick health verification
+    local worker_ok=false
+    if lsof -i ":$WORKER_PORT_BASE" -sTCP:LISTEN -t >/dev/null 2>&1; then
+        worker_ok=true
+    fi
+    if $worker_ok; then
+        log_info "Workers ready (manager pid=$worker_pid)"
+    else
+        log_warn "Workers starting slowly (manager pid=$worker_pid)"
+    fi
+
+    # ── Summary ──
+    echo ""
+    echo -e "  ${BOLD}${GREEN}All services started successfully!${NC}"
+    echo ""
+    echo -e "  ${DIM}Dashboard${NC}    http://localhost:$GATEWAY_PORT"
+    echo -e "  ${DIM}API${NC}          http://localhost:$GATEWAY_PORT/api"
+    echo -e "  ${DIM}Scheduler${NC}    http://localhost:$SCHEDULER_PORT/health"
+    echo -e "  ${DIM}Logs${NC}         teamlab logs"
+    echo ""
+
+    if $daemon; then
+        echo -e "  ${DIM}Running in background. Use ${NC}${BOLD}teamlab status${NC}${DIM} to check, ${NC}${BOLD}teamlab stop${NC}${DIM} to shutdown.${NC}"
+        echo ""
+        # Daemon mode: write a marker and exit
+        echo "$(date +%s)" > "$RUN_DIR/daemon.marker"
+        exit 0
+    else
+        echo -e "  ${DIM}Running in foreground. Press ${NC}${BOLD}Ctrl+C${NC}${DIM} to stop all services.${NC}"
+        echo ""
+
+        # Foreground: trap signals and wait
+        trap 'echo ""; cmd_stop; exit 0' INT TERM
+
+        # Monitor children
+        while true; do
+            for comp in gateway scheduler workers; do
+                if ! is_running "$comp"; then
+                    log_warn "$comp exited unexpectedly — restarting..."
+                    case "$comp" in
+                        gateway)
+                            nohup "$python_bin" main.py web --port "$GATEWAY_PORT" >> "$gw_log" 2>&1 &
+                            write_pid "gateway" $!
+                            disown $! 2>/dev/null
+                            ;;
+                        scheduler)
+                            nohup "$python_bin" main.py scheduler >> "$sched_log" 2>&1 &
+                            write_pid "scheduler" $!
+                            disown $! 2>/dev/null
+                            ;;
+                        workers)
+                            nohup "$python_bin" main.py workers --count "$WORKER_COUNT" >> "$worker_log" 2>&1 &
+                            write_pid "workers" $!
+                            disown $! 2>/dev/null
+                            ;;
+                    esac
+                fi
+            done
+            sleep 3
+        done
+    fi
+}
+
+
+cmd_stop() {
+    echo ""
+    echo -e "  ${BOLD}Stopping services...${NC}"
+
+    local stopped=0
+
+    for comp in workers scheduler gateway; do
+        local pid
+        if pid="$(read_pid "$comp")"; then
+            kill "$pid" 2>/dev/null || true
+
+            # Wait for graceful exit (max 8s)
+            local wait_count=0
+            while kill -0 "$pid" 2>/dev/null && [ "$wait_count" -lt 8 ]; do
+                sleep 1
+                wait_count=$((wait_count + 1))
+            done
+
+            if kill -0 "$pid" 2>/dev/null; then
+                kill -9 "$pid" 2>/dev/null || true
+                log_warn "$comp force-killed (pid=$pid)"
+            else
+                log_info "$comp stopped (pid=$pid)"
+            fi
+            remove_pid "$comp"
+            stopped=$((stopped + 1))
+        else
+            echo -e "  ${DIM}$comp: not running${NC}"
+        fi
+    done
+
+    # Also kill any orphan worker processes
+    pkill -f "workers.worker.*openclaw_teamlab" 2>/dev/null || true
+
+    # Clean up stale ports
+    for port in "$GATEWAY_PORT" "$SCHEDULER_PORT"; do
+        local port_pid
+        port_pid="$(lsof -i ":$port" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)"
+        if [ -n "$port_pid" ]; then
+            kill -9 "$port_pid" 2>/dev/null || true
+        fi
+    done
+
+    rm -f "$RUN_DIR/daemon.marker"
+
+    echo ""
+    if [ "$stopped" -gt 0 ]; then
+        echo -e "  ${GREEN}Stopped $stopped service(s).${NC}"
+    else
+        echo -e "  ${DIM}No running services found.${NC}"
+    fi
+    echo ""
+}
+
+
+cmd_restart() {
+    cmd_stop
+    sleep 2
+    cmd_start "$@"
+}
+
+
+cmd_status() {
+    print_banner
+
+    # ── Process Status ──
+    echo -e "  ${BOLD}Services${NC}"
+
+    local all_ok=true
+
+    for comp in gateway scheduler workers; do
+        local pid
+        if pid="$(read_pid "$comp")"; then
+            local mem
+            mem="$(ps -o rss= -p "$pid" 2>/dev/null | awk '{printf "%.0fMB", $1/1024}' || echo "?")"
+            echo -e "  ${GREEN}●${NC} ${comp}       ${DIM}pid=$pid  mem=$mem${NC}"
+        else
+            echo -e "  ${RED}●${NC} ${comp}       ${DIM}stopped${NC}"
+            all_ok=false
+        fi
+    done
+
+    echo ""
+
+    # ── API Health ──
+    echo -e "  ${BOLD}Health Checks${NC}"
+
+    # Gateway
+    local gw_status
+    gw_status="$(curl -s --max-time 3 "http://localhost:$GATEWAY_PORT/api/system/status" 2>/dev/null || echo "")"
+    if [ -n "$gw_status" ]; then
+        local workers_active queue_len uptime redis
+        workers_active="$(echo "$gw_status" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("active_workers",0))' 2>/dev/null || echo "?")"
+        queue_len="$(echo "$gw_status" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("queue_length",0))' 2>/dev/null || echo "?")"
+        uptime="$(echo "$gw_status" | python3 -c 'import sys,json; s=json.load(sys.stdin).get("uptime_seconds",0); print(f"{s//3600}h{(s%3600)//60}m")' 2>/dev/null || echo "?")"
+        redis="$(echo "$gw_status" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("redis","?"))' 2>/dev/null || echo "?")"
+
+        echo -e "  ${GREEN}●${NC} Gateway API  ${DIM}uptime=$uptime  workers=$workers_active  queue=$queue_len  redis=$redis${NC}"
+    else
+        echo -e "  ${RED}●${NC} Gateway API  ${DIM}unreachable${NC}"
+        all_ok=false
+    fi
+
+    # Scheduler
+    local sched_status
+    sched_status="$(curl -s --max-time 3 "http://localhost:$SCHEDULER_PORT/health" 2>/dev/null || echo "")"
+    if [ -n "$sched_status" ]; then
+        local job_count sched_uptime
+        job_count="$(echo "$sched_status" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("job_count",0))' 2>/dev/null || echo "?")"
+        sched_uptime="$(echo "$sched_status" | python3 -c 'import sys,json; s=json.load(sys.stdin).get("uptime_seconds",0); print(f"{s//3600}h{(s%3600)//60}m")' 2>/dev/null || echo "?")"
+        echo -e "  ${GREEN}●${NC} Scheduler    ${DIM}uptime=$sched_uptime  jobs=$job_count${NC}"
+    else
+        echo -e "  ${RED}●${NC} Scheduler    ${DIM}unreachable${NC}"
+        all_ok=false
+    fi
+
+    echo ""
+
+    # ── Endpoints ──
+    echo -e "  ${BOLD}Endpoints${NC}"
+    echo -e "  ${DIM}Dashboard${NC}    http://localhost:$GATEWAY_PORT"
+    echo -e "  ${DIM}API${NC}          http://localhost:$GATEWAY_PORT/api"
+    echo -e "  ${DIM}WebSocket${NC}    ws://localhost:$GATEWAY_PORT/ws"
+    echo ""
+
+    # ── IM Channels ──
+    echo -e "  ${BOLD}IM Channels${NC}"
+    local feishu_id dingtalk_id
+    feishu_id="$(python -c 'from config.settings import settings; print(settings.FEISHU_APP_ID or "")' 2>/dev/null || echo "")"
+    dingtalk_id="$(python -c 'from config.settings import settings; print(settings.DINGTALK_CLIENT_ID or "")' 2>/dev/null || echo "")"
+
+    if [ -n "$feishu_id" ]; then
+        echo -e "  ${GREEN}●${NC} Feishu       ${DIM}app_id=${feishu_id:0:16}...${NC}"
+    else
+        echo -e "  ${DIM}○${NC} Feishu       ${DIM}not configured${NC}"
+    fi
+
+    if [ -n "$dingtalk_id" ]; then
+        echo -e "  ${GREEN}●${NC} DingTalk     ${DIM}client_id=${dingtalk_id:0:16}...${NC}"
+    else
+        echo -e "  ${DIM}○${NC} DingTalk     ${DIM}not configured${NC}"
+    fi
+
+    echo ""
+}
+
+
+cmd_logs() {
+    local component="${1:-all}"
+    local lines="${2:-50}"
+
+    case "$component" in
+        gateway|scheduler|workers)
+            local logfile="$LOG_DIR/${INSTANCE_NAME}_${component}.log"
+            if [ -f "$logfile" ]; then
+                echo -e "  ${DIM}Tailing $logfile ...${NC}"
+                echo ""
+                tail -f -n "$lines" "$logfile"
+            else
+                log_error "Log file not found: $logfile"
+            fi
+            ;;
+        all|"")
+            echo -e "  ${DIM}Tailing all logs (Ctrl+C to stop)...${NC}"
+            echo ""
+            tail -f -n "$lines" \
+                "$LOG_DIR/${INSTANCE_NAME}_gateway.log" \
+                "$LOG_DIR/${INSTANCE_NAME}_scheduler.log" \
+                "$LOG_DIR/${INSTANCE_NAME}_workers.log" \
+                2>/dev/null
+            ;;
+        *)
+            log_error "Unknown component: $component"
+            echo "  Available: gateway, scheduler, workers, all"
+            ;;
+    esac
+}
+
+
+cmd_doctor() {
+    print_banner
+    echo -e "  ${BOLD}System Diagnostics${NC}"
+    echo ""
+
+    # Python
+    local py_ver
+    py_ver="$(python --version 2>&1 || echo "not found")"
+    log_info "Python: $py_ver ($(which python))"
+
+    # Key dependencies
+    for pkg in fastapi uvicorn sqlalchemy redis lark_oapi dingtalk_stream openai apscheduler; do
+        if python -c "import $pkg" 2>/dev/null; then
+            echo -e "    ${GREEN}✓${NC} $pkg"
+        else
+            echo -e "    ${RED}✗${NC} $pkg ${DIM}(pip install $pkg)${NC}"
+        fi
+    done
+
+    echo ""
+
+    # Ports
+    echo -e "  ${BOLD}Ports${NC}"
+    for port in "$GATEWAY_PORT" "$SCHEDULER_PORT" "$WORKER_PORT_BASE"; do
+        if check_port "$port"; then
+            echo -e "    ${GREEN}✓${NC} :$port free"
+        else
+            local blocker
+            blocker="$(lsof -i ":$port" -sTCP:LISTEN -t 2>/dev/null | head -1)"
+            echo -e "    ${RED}✗${NC} :$port in use (pid=$blocker)"
+        fi
+    done
+
+    echo ""
+
+    # Database
+    echo -e "  ${BOLD}Database${NC}"
+    python -c "
+import asyncio
+from config.database import init_db, close_db
+async def check():
+    try:
+        await init_db()
+        await close_db()
+        print('    \033[0;32m✓\033[0m MySQL (openclaw_teamlab) connected')
+    except Exception as e:
+        print(f'    \033[0;31m✗\033[0m MySQL: {e}')
+asyncio.run(check())
+" 2>/dev/null || echo -e "    ${RED}✗${NC} MySQL check failed"
+
+    python -c "
+import asyncio
+from config.coevo_db import init_coevo_db, close_coevo_db
+async def check():
+    try:
+        await init_coevo_db()
+        await close_coevo_db()
+        print('    \033[0;32m✓\033[0m MySQL (cognalign_coevo_prod) connected')
+    except Exception as e:
+        print(f'    \033[0;31m✗\033[0m CoEvo DB: {e}')
+asyncio.run(check())
+" 2>/dev/null || echo -e "    ${RED}✗${NC} CoEvo DB check failed"
+
+    # Redis
+    python -c "
+import asyncio, redis.asyncio as aioredis
+from config.settings import settings
+async def check():
+    try:
+        r = aioredis.from_url(settings.REDIS_URL)
+        await r.ping()
+        await r.close()
+        print('    \033[0;32m✓\033[0m Redis connected')
+    except Exception as e:
+        print(f'    \033[0;31m✗\033[0m Redis: {e}')
+asyncio.run(check())
+" 2>/dev/null || echo -e "    ${RED}✗${NC} Redis check failed"
+
+    echo ""
+
+    # .env
+    echo -e "  ${BOLD}Configuration${NC}"
+    if [ -f "$SCRIPT_DIR/.env" ]; then
+        log_info ".env found"
+    else
+        log_error ".env missing"
+    fi
+    echo ""
+}
+
+
+cmd_init_db() {
+    echo ""
+    log_step "Initializing database..."
+    cd "$SCRIPT_DIR"
+    python main.py init-db
+    echo ""
+}
+
+
+cmd_version() {
+    echo -e "  OpenClaw TeamLab ${BOLD}v0.1.0${NC}"
+    echo -e "  Python: $(python --version 2>&1) ($(which python))"
+    echo -e "  Path: $SCRIPT_DIR"
+}
+
+
+cmd_help() {
+    echo ""
+    echo -e "  ${BOLD}OpenClaw TeamLab${NC} — AI Research Team Management Platform"
+    echo ""
+    echo -e "  ${BOLD}Usage:${NC}  teamlab <command> [options]"
+    echo ""
+    echo -e "  ${BOLD}Service Commands:${NC}"
+    echo -e "    start [-d]      Start all services ${DIM}(-d for daemon/background mode)${NC}"
+    echo -e "    stop            Graceful shutdown of all services"
+    echo -e "    restart [-d]    Stop then start all services"
+    echo -e "    status          Show service health dashboard"
+    echo -e "    logs [name]     Tail logs ${DIM}(gateway|scheduler|workers|all)${NC}"
+    echo ""
+    echo -e "  ${BOLD}Setup Commands:${NC}"
+    echo -e "    init-db         Initialize database tables + seed data"
+    echo -e "    doctor          Run diagnostics (ports, deps, DB connectivity)"
+    echo ""
+    echo -e "  ${BOLD}Other:${NC}"
+    echo -e "    version         Show version info"
+    echo -e "    help            Show this help message"
+    echo ""
+    echo -e "  ${BOLD}Examples:${NC}"
+    echo -e "    ${DIM}teamlab start${NC}            # Foreground mode (Ctrl+C to stop)"
+    echo -e "    ${DIM}teamlab start -d${NC}         # Background/daemon mode"
+    echo -e "    ${DIM}teamlab status${NC}           # Health dashboard"
+    echo -e "    ${DIM}teamlab logs gateway${NC}     # Follow gateway logs"
+    echo -e "    ${DIM}teamlab restart -d${NC}       # Restart in background"
+    echo ""
+}
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Main dispatch
+# ═══════════════════════════════════════════════════════════════════
+
+cd "$SCRIPT_DIR"
+activate_conda
+
+COMMAND="${1:-help}"
+shift 2>/dev/null || true
+
+case "$COMMAND" in
+    start|up|all)    cmd_start "$@" ;;
+    stop|down)       cmd_stop ;;
+    restart)         cmd_restart "$@" ;;
+    status|ps)       cmd_status ;;
+    logs|log)        cmd_logs "$@" ;;
+    init-db|initdb)  cmd_init_db ;;
+    doctor|check)    cmd_doctor ;;
+    version|v|-v)    cmd_version ;;
+    help|-h|--help)  cmd_help ;;
+    *)
+        log_error "Unknown command: $COMMAND"
+        cmd_help
+        exit 1
+        ;;
+esac

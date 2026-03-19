@@ -1,0 +1,2280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw TeamLab — 智能科研团队管理</title>
+
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <!-- ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <!-- Animate.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    claw: {
+                        50:  '#fff1f2', 100: '#ffe4e6', 200: '#fecdd3',
+                        300: '#fda4af', 400: '#fb7185', 500: '#DC3545',
+                        600: '#c22030', 700: '#9f1a28', 800: '#7f1d2b', 900: '#5c1520',
+                    },
+                    ocean: {
+                        50:  '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd',
+                        300: '#7dd3fc', 400: '#38bdf8', 500: '#0ea5e9',
+                        600: '#0284c7', 700: '#0369a1', 800: '#075985', 900: '#0c4a6e',
+                    },
+                    dark: {
+                        bg:     '#0a0e1a',
+                        card:   '#111827',
+                        border: '#1e293b',
+                        hover:  '#1a2332',
+                        input:  '#0f172a',
+                    }
+                },
+                fontFamily: {
+                    sans: ['Inter', 'system-ui', 'sans-serif'],
+                    mono: ['JetBrains Mono', 'monospace'],
+                },
+                animation: {
+                    'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    'glow': 'glow 2s ease-in-out infinite alternate',
+                    'float': 'float 6s ease-in-out infinite',
+                    'slide-up': 'slideUp 0.5s ease-out',
+                    'fade-in': 'fadeIn 0.6s ease-out',
+                },
+                keyframes: {
+                    glow: {
+                        '0%': { boxShadow: '0 0 5px rgba(220,53,69,0.2), 0 0 20px rgba(220,53,69,0.1)' },
+                        '100%': { boxShadow: '0 0 20px rgba(220,53,69,0.4), 0 0 60px rgba(220,53,69,0.2)' },
+                    },
+                    float: {
+                        '0%, 100%': { transform: 'translateY(0)' },
+                        '50%': { transform: 'translateY(-10px)' },
+                    },
+                    slideUp: {
+                        '0%': { opacity: 0, transform: 'translateY(20px)' },
+                        '100%': { opacity: 1, transform: 'translateY(0)' },
+                    },
+                    fadeIn: {
+                        '0%': { opacity: 0 },
+                        '100%': { opacity: 1 },
+                    },
+                },
+            },
+        },
+    }
+    </script>
+    <style>
+        body { background: #0a0e1a; }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Glass morphism */
+        .glass { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.05); }
+        .glass-hover:hover { background: rgba(26, 35, 50, 0.8); border-color: rgba(220,53,69,0.3); }
+
+        /* Neon glow effects */
+        .neon-red { text-shadow: 0 0 10px rgba(220,53,69,0.5), 0 0 40px rgba(220,53,69,0.2); }
+        .neon-blue { text-shadow: 0 0 10px rgba(14,165,233,0.5), 0 0 40px rgba(14,165,233,0.2); }
+        .neon-border { box-shadow: 0 0 15px rgba(220,53,69,0.15), inset 0 0 15px rgba(220,53,69,0.05); }
+
+        /* Grid pattern background */
+        .grid-bg {
+            background-image:
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* Gradient text */
+        .gradient-text {
+            background: linear-gradient(135deg, #DC3545 0%, #fb7185 40%, #38bdf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Particle canvas */
+        #particles { position: fixed; top: 0; left: 0; z-index: 0; pointer-events: none; }
+
+        /* Transition group */
+        .list-enter-active, .list-leave-active { transition: all 0.4s ease; }
+        .list-enter-from, .list-leave-to { opacity: 0; transform: translateX(-20px); }
+
+        /* Chart containers */
+        .chart-container { width: 100%; height: 100%; min-height: 300px; }
+
+        /* Status indicator pulse */
+        .status-dot { animation: statusPulse 2s ease-in-out infinite; }
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="dark bg-dark-bg text-gray-100 font-sans min-h-screen">
+    <canvas id="particles"></canvas>
+
+    <div id="app" class="relative z-10">
+        <!-- Top Navigation -->
+        <nav class="fixed top-0 left-0 right-0 z-50 glass border-b border-dark-border">
+            <div class="max-w-[1920px] mx-auto px-6 h-16 flex items-center justify-between">
+                <!-- Logo & Brand -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-claw-500 to-claw-700 flex items-center justify-center animate-float">
+                        <svg viewBox="0 0 24 24" class="w-6 h-6 text-white" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold gradient-text tracking-tight">TeamLab</h1>
+                        <p class="text-[10px] text-gray-500 -mt-0.5 font-mono">OpenClaw Powered</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <div class="flex items-center gap-1">
+                    <button v-for="tab in tabs" :key="tab.id"
+                        @click="currentTab = tab.id"
+                        :class="[
+                            'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300',
+                            currentTab === tab.id
+                                ? 'bg-claw-500/20 text-claw-400 neon-border'
+                                : 'text-gray-400 hover:text-gray-200 hover:bg-dark-hover'
+                        ]">
+                        <span class="mr-1.5">{{ tab.icon }}</span>
+                        {{ tab.label }}
+                    </button>
+                </div>
+
+                <!-- Status Indicators -->
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="status-dot w-2 h-2 rounded-full" :class="systemOk ? 'bg-emerald-400' : 'bg-red-400'"></span>
+                        <span class="text-gray-400">{{ workerInfo }}</span>
+                    </div>
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-ocean-500 to-ocean-700 flex items-center justify-center text-xs font-bold cursor-pointer"
+                         @click="currentTab = 'chat'">
+                        PI
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Toast notification -->
+        <transition name="fade">
+            <div v-if="toastVisible"
+                 class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-xl glass border border-dark-border text-sm text-gray-200 shadow-lg animate-slide-up">
+                {{ toastMessage }}
+            </div>
+        </transition>
+
+        <!-- Main Content -->
+        <main class="pt-20 pb-8 px-6 max-w-[1920px] mx-auto grid-bg min-h-screen">
+
+            <!-- ====== PROJECTS OVERVIEW ====== -->
+            <div v-if="currentTab === 'projects'" class="animate-fade-in">
+                <!-- Stats Row -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div v-for="stat in dashboardStats" :key="stat.label"
+                         class="glass rounded-2xl p-5 glass-hover transition-all duration-300 cursor-pointer group">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-2xl">{{ stat.icon }}</span>
+                            <span class="text-xs font-mono px-2 py-0.5 rounded-full bg-ocean-500/10 text-ocean-400" v-if="stat.sub">
+                                {{ stat.sub }}
+                            </span>
+                            <span v-else-if="stat.trend !== undefined" class="text-xs font-mono px-2 py-0.5 rounded-full"
+                                  :class="stat.trend > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-500/20 text-gray-400'">
+                                {{ stat.trend > 0 ? '+' : '' }}{{ stat.trend }}%
+                            </span>
+                        </div>
+                        <div class="text-3xl font-bold text-white group-hover:gradient-text transition-all">{{ stat.value }}</div>
+                        <div class="text-sm text-gray-500 mt-1">{{ stat.label }}</div>
+                    </div>
+                </div>
+
+                <!-- Project Cards + Research Direction Overview -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <!-- Project Cards (left 2/3) -->
+                    <div class="lg:col-span-2 glass rounded-2xl p-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <span class="w-1 h-5 bg-ocean-500 rounded-full"></span>
+                            项目一览
+                        </h3>
+                        <div v-if="projectsOverview.length > 0" class="space-y-3">
+                            <div v-for="proj in projectsOverview" :key="proj.id"
+                                 class="p-4 rounded-xl bg-dark-hover hover:bg-dark-border/60 transition-all">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium text-white text-sm">{{ proj.name }}</span>
+                                    <span class="text-xs text-gray-500 font-mono">{{ proj.member_count }} 成员</span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex-1 h-1.5 bg-dark-border rounded-full overflow-hidden">
+                                        <div class="h-full bg-emerald-500 rounded-full transition-all"
+                                             :style="{ width: Math.min((proj.completed_meetings / Math.max(...projectsOverview.map(p => p.completed_meetings || 1), 1)) * 100, 100) + '%' }"></div>
+                                    </div>
+                                    <span class="text-xs text-emerald-400 font-mono whitespace-nowrap">{{ proj.completed_meetings }} 次会议</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="text-center py-8 text-gray-500 text-sm">
+                            <div class="text-3xl mb-2">🏗</div>
+                            加载项目数据中...
+                        </div>
+                    </div>
+
+                    <!-- Research Direction Clusters Overview (right 1/3) -->
+                    <div class="glass rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold flex items-center gap-2">
+                                <span class="w-1 h-5 bg-purple-500 rounded-full"></span>
+                                研究方向
+                            </h3>
+                            <span v-if="pendingIdeasCount > 0"
+                                  class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-mono animate-pulse">
+                                {{ pendingIdeasCount }} 待激活
+                            </span>
+                        </div>
+                        <div v-if="directionClusters.length > 0">
+                            <div v-for="(group, groupName) in Object.fromEntries([...new Set(directionClusters.map(c=>c.similarity_group))].map(g=>[g, directionClusters.filter(c=>c.similarity_group===g)]))"
+                                 :key="groupName" class="mb-4">
+                                <div class="text-xs text-gray-500 mb-2 font-mono">{{ groupName }}</div>
+                                <div class="flex flex-wrap gap-1.5">
+                                    <button v-for="cluster in group" :key="cluster.id"
+                                            @click="currentTab='directions'; selectedCluster=cluster"
+                                            class="text-xs px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-300 hover:bg-purple-500/30 transition-all border border-purple-500/20">
+                                        {{ cluster.topic }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="text-center py-6 text-gray-500 text-sm">
+                            <div class="text-2xl mb-2">🧭</div>
+                            暂无方向数据<br>
+                            <button @click="currentTab='directions'"
+                                    class="mt-2 text-xs text-purple-400 hover:text-purple-300">前往研究方向 →</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Command Center: Team Health + Risk Alerts ── -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <!-- Team Health Gauge -->
+                    <div class="glass rounded-2xl p-6 flex flex-col items-center">
+                        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                            <span class="w-1 h-5 bg-emerald-500 rounded-full"></span>
+                            团队健康指数
+                        </h3>
+                        <div id="health-gauge-project" style="width:260px;height:200px;"></div>
+                        <div v-if="teamHealth" class="grid grid-cols-2 gap-3 mt-2 w-full">
+                            <div class="text-center p-2 rounded-lg bg-dark-hover">
+                                <div class="text-xs text-gray-500">风险控制</div>
+                                <div class="text-lg font-bold" :class="teamHealth.components.risk_health >= 60 ? 'text-emerald-400' : 'text-amber-400'">
+                                    {{ teamHealth.components.risk_health.toFixed(0) }}
+                                </div>
+                            </div>
+                            <div class="text-center p-2 rounded-lg bg-dark-hover">
+                                <div class="text-xs text-gray-500">参与度</div>
+                                <div class="text-lg font-bold" :class="teamHealth.components.engagement_health >= 60 ? 'text-emerald-400' : 'text-amber-400'">
+                                    {{ teamHealth.components.engagement_health.toFixed(0) }}
+                                </div>
+                            </div>
+                            <div class="text-center p-2 rounded-lg bg-dark-hover">
+                                <div class="text-xs text-gray-500">阻塞解决</div>
+                                <div class="text-lg font-bold" :class="teamHealth.components.blocker_resolution >= 60 ? 'text-emerald-400' : 'text-amber-400'">
+                                    {{ teamHealth.components.blocker_resolution.toFixed(0) }}
+                                </div>
+                            </div>
+                            <div class="text-center p-2 rounded-lg bg-dark-hover">
+                                <div class="text-xs text-gray-500">协作活跃</div>
+                                <div class="text-lg font-bold" :class="teamHealth.components.collaboration_activity >= 60 ? 'text-emerald-400' : 'text-amber-400'">
+                                    {{ teamHealth.components.collaboration_activity.toFixed(0) }}
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="text-gray-600 text-sm mt-4">加载中...</div>
+                    </div>
+
+                    <!-- Risk Alert Panel -->
+                    <div class="lg:col-span-2 glass rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold flex items-center gap-2">
+                                <span class="w-1 h-5 bg-red-500 rounded-full"></span>
+                                学生风险预警
+                                <span v-if="riskDashboard && riskDashboard.summary.red > 0"
+                                      class="ml-2 px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs font-mono animate-pulse">
+                                    {{ riskDashboard.summary.red }} 需关注
+                                </span>
+                            </h3>
+                            <button @click="triggerRiskCompute"
+                                    :disabled="riskComputing"
+                                    class="px-3 py-1.5 rounded-lg bg-claw-500/20 text-claw-400 text-xs hover:bg-claw-500/30 transition-all disabled:opacity-50">
+                                {{ riskComputing ? '计算中...' : '重新评估' }}
+                            </button>
+                        </div>
+                        <div v-if="riskDashboard && riskDashboard.claw_students && riskDashboard.claw_students.length > 0" class="space-y-2 max-h-[350px] overflow-y-auto custom-scrollbar">
+                            <div v-for="s in riskDashboard.claw_students" :key="s.coevo_user_id"
+                                 class="flex items-center gap-3 p-3 rounded-xl hover:bg-dark-hover transition-all cursor-pointer"
+                                 @click="loadStudentNarrative(s.coevo_user_id)">
+                                <div class="w-3 h-3 rounded-full shrink-0"
+                                     :class="{'bg-red-500 animate-pulse': s.risk_level==='red',
+                                              'bg-amber-500': s.risk_level==='yellow',
+                                              'bg-emerald-500': s.risk_level==='green'}"></div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm font-medium text-gray-200">{{ s.student_name }}</span>
+                                        <span class="text-xs font-mono px-1.5 py-0.5 rounded"
+                                              :class="{'bg-red-500/20 text-red-400': s.risk_level==='red',
+                                                        'bg-amber-500/20 text-amber-400': s.risk_level==='yellow',
+                                                        'bg-emerald-500/20 text-emerald-400': s.risk_level==='green'}">
+                                            {{ s.overall_score.toFixed(0) }}
+                                        </span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-0.5 truncate">{{ s.explanation }}</div>
+                                </div>
+                                <div class="flex gap-1 shrink-0">
+                                    <div class="w-1.5 rounded-full bg-dark-border" style="height:30px">
+                                        <div class="w-full rounded-full bg-red-400/60" :style="{height: s.blocker_persistence + '%'}"></div>
+                                    </div>
+                                    <div class="w-1.5 rounded-full bg-dark-border" style="height:30px">
+                                        <div class="w-full rounded-full bg-amber-400/60" :style="{height: s.goal_completion_gap + '%'}"></div>
+                                    </div>
+                                    <div class="w-1.5 rounded-full bg-dark-border" style="height:30px">
+                                        <div class="w-full rounded-full bg-blue-400/60" :style="{height: s.engagement_decline + '%'}"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else-if="riskDashboard" class="text-center py-8 text-gray-500">
+                            <div class="text-3xl mb-2">✅</div>
+                            <div>暂无风险数据，点击"重新评估"开始分析</div>
+                        </div>
+                        <div v-else class="text-center py-8 text-gray-600 text-sm">加载中...</div>
+                    </div>
+                </div>
+
+                <!-- ── Action Items + Student Narrative ── -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6" v-if="actionItems || studentNarrative">
+                    <div class="glass rounded-2xl p-6" v-if="actionItems">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <span class="w-1 h-5 bg-amber-500 rounded-full"></span>
+                            待办跟踪
+                            <span v-if="actionItems.summary.stale > 0"
+                                  class="ml-2 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-mono">
+                                {{ actionItems.summary.stale }} 过期
+                            </span>
+                        </h3>
+                        <div class="grid grid-cols-4 gap-2 text-center text-xs mb-3">
+                            <div class="p-2 rounded-lg bg-red-500/10"><span class="text-red-400 font-bold text-lg">{{ actionItems.summary.stale }}</span><br>过期</div>
+                            <div class="p-2 rounded-lg bg-amber-500/10"><span class="text-amber-400 font-bold text-lg">{{ actionItems.summary.open }}</span><br>待完成</div>
+                            <div class="p-2 rounded-lg bg-blue-500/10"><span class="text-blue-400 font-bold text-lg">{{ actionItems.summary.in_progress }}</span><br>进行中</div>
+                            <div class="p-2 rounded-lg bg-emerald-500/10"><span class="text-emerald-400 font-bold text-lg">{{ actionItems.summary.done }}</span><br>已完成</div>
+                        </div>
+                        <div class="space-y-1.5 max-h-[200px] overflow-y-auto custom-scrollbar">
+                            <div v-for="item in actionItems.items.slice(0, 8)" :key="item.id"
+                                 class="flex items-center gap-2 p-2 rounded-lg bg-dark-hover text-xs">
+                                <span class="w-2 h-2 rounded-full shrink-0"
+                                      :class="{'bg-red-500': item.status==='stale', 'bg-amber-500': item.status==='open',
+                                               'bg-blue-500': item.status==='in_progress', 'bg-emerald-500': item.status==='done'}"></span>
+                                <span class="text-gray-400 shrink-0 w-16 truncate">{{ item.assignee_name }}</span>
+                                <span class="text-gray-300 flex-1 truncate">{{ item.action_text }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass rounded-2xl p-6" v-if="studentNarrative">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <span class="w-1 h-5 bg-purple-500 rounded-full"></span>
+                            {{ studentNarrative.student_name }} — 成长叙事
+                            <span class="text-xs text-gray-500 font-normal">近{{ studentNarrative.months_covered }}个月</span>
+                        </h3>
+                        <div class="text-sm text-gray-300 leading-relaxed whitespace-pre-line max-h-[300px] overflow-y-auto custom-scrollbar">
+                            {{ studentNarrative.narrative }}
+                        </div>
+                        <div v-if="studentNarrative.current_assessment" class="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                            <div class="text-xs text-blue-400 font-semibold mb-1">当前评估</div>
+                            <div class="text-sm text-gray-300">{{ studentNarrative.current_assessment }}</div>
+                        </div>
+                        <div v-if="studentNarrative.recommendations && studentNarrative.recommendations.length > 0" class="mt-3">
+                            <div class="text-xs text-gray-500 mb-1">建议</div>
+                            <div v-for="(rec, i) in studentNarrative.recommendations" :key="i"
+                                 class="text-xs text-gray-400 flex gap-1 mb-0.5">
+                                <span class="text-emerald-400">{{ i + 1 }}.</span> {{ rec }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Recent Activity -->
+                    <div class="lg:col-span-2 glass rounded-2xl p-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <span class="w-1 h-5 bg-claw-500 rounded-full"></span>
+                            最近动态
+                        </h3>
+                        <div class="space-y-3">
+                            <div v-for="(event, i) in recentEvents" :key="i"
+                                 class="flex items-start gap-3 p-3 rounded-xl hover:bg-dark-hover transition-all duration-200"
+                                 :style="{ animationDelay: i * 100 + 'ms' }">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
+                                     :class="eventColors[event.type] || 'bg-gray-700'">
+                                    {{ eventIcons[event.type] || '📌' }}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-medium text-gray-200">{{ event.title }}</div>
+                                    <div class="text-xs text-gray-500 mt-0.5">{{ event.student }} · {{ event.date }}</div>
+                                </div>
+                                <span class="text-xs px-2 py-0.5 rounded-full bg-dark-border text-gray-400 shrink-0">{{ event.type_label }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Insights -->
+                    <div class="glass rounded-2xl p-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <span class="w-1 h-5 bg-ocean-500 rounded-full"></span>
+                            AI 洞察
+                        </h3>
+                        <div class="space-y-3">
+                            <div v-for="(insight, i) in aiInsights" :key="i"
+                                 class="p-3 rounded-xl border border-dark-border hover:border-ocean-500/30 transition-all duration-300 cursor-pointer"
+                                 @click="handleInsight(insight)">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-xs px-2 py-0.5 rounded-full"
+                                          :class="insight.category === 'trend' ? 'bg-purple-500/20 text-purple-400' :
+                                                   insight.category === 'collab' ? 'bg-blue-500/20 text-blue-400' :
+                                                   'bg-amber-500/20 text-amber-400'">
+                                        {{ insight.category_label }}
+                                    </span>
+                                </div>
+                                <p class="text-sm text-gray-300">{{ insight.text }}</p>
+                                <p class="text-xs text-gray-600 mt-1">{{ insight.date }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== MEMBERS ====== -->
+            <div v-if="currentTab === 'members'" class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold gradient-text">团队成员</h2>
+                    <button @click="showAddStudent = true"
+                            class="px-4 py-2 bg-claw-500 hover:bg-claw-600 rounded-xl text-sm font-medium transition-all">
+                        + 添加成员
+                    </button>
+                </div>
+
+                <!-- Student Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                    <div v-for="student in students" :key="student.id"
+                         @click="selectStudent(student)"
+                         class="glass rounded-2xl p-5 glass-hover transition-all duration-300 cursor-pointer group">
+                        <div class="flex items-center gap-4 mb-4">
+                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-ocean-500 to-purple-600 flex items-center justify-center text-xl font-bold">
+                                {{ student.name[0] }}
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-white group-hover:text-claw-400 transition-colors">{{ student.name }}</h4>
+                                <p class="text-xs text-gray-500">{{ student.degree_label }} · {{ student.research_area }}</p>
+                            </div>
+                            <span class="ml-auto text-xs px-2 py-0.5 rounded-full"
+                                  :class="student.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-500/20 text-gray-400'">
+                                {{ student.status_label }}
+                            </span>
+                        </div>
+                        <!-- Mini Radar -->
+                        <div :id="'mini-radar-' + student.id" style="height: 180px;"></div>
+                        <!-- Recent Events -->
+                        <div class="mt-3 flex flex-wrap gap-1">
+                            <span v-for="tag in student.tags?.slice(0, 3)" :key="tag"
+                                  class="text-[10px] px-2 py-0.5 rounded-full bg-dark-border text-gray-400">
+                                {{ tag }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student Detail Modal -->
+                <div v-if="selectedStudent" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                     @click.self="selectedStudent = null">
+                    <div class="glass rounded-3xl w-[900px] max-h-[85vh] overflow-y-auto p-8 animate-slide-up neon-border">
+                        <div class="flex items-center justify-between mb-6">
+                            <div class="flex items-center gap-4">
+                                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-claw-500 to-purple-600 flex items-center justify-center text-2xl font-bold">
+                                    {{ selectedStudent.name[0] }}
+                                </div>
+                                <div>
+                                    <h3 class="text-2xl font-bold text-white">{{ selectedStudent.name }}</h3>
+                                    <p class="text-sm text-gray-400">{{ selectedStudent.research_area }}</p>
+                                </div>
+                            </div>
+                            <button @click="selectedStudent = null" class="text-gray-500 hover:text-white text-2xl">&times;</button>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-6">
+                            <!-- Full Radar Chart -->
+                            <div class="glass rounded-2xl p-4">
+                                <h4 class="text-sm font-semibold text-gray-400 mb-2">能力雷达</h4>
+                                <div id="detail-radar" class="chart-container" style="height: 300px;"></div>
+                            </div>
+                            <!-- Timeline -->
+                            <div class="glass rounded-2xl p-4">
+                                <h4 class="text-sm font-semibold text-gray-400 mb-2">成长轨迹</h4>
+                                <div id="detail-timeline" class="chart-container" style="height: 300px;"></div>
+                            </div>
+                        </div>
+
+                        <!-- AI Guidance -->
+                        <div class="glass rounded-2xl p-5 mt-4">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="text-lg">🤖</span>
+                                <h4 class="text-sm font-semibold text-gray-400">AI 指导建议</h4>
+                                <button @click="refreshGuidance(selectedStudent)"
+                                        class="ml-auto text-xs px-3 py-1 bg-ocean-500/20 text-ocean-400 rounded-lg hover:bg-ocean-500/30 transition-all">
+                                    刷新建议
+                                </button>
+                            </div>
+                            <div class="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{{ selectedStudent.guidance || '点击"刷新建议"获取 AI 个性化指导...' }}</div>
+                        </div>
+                        <!-- CoEvo Goals (from prod data) -->
+                        <div v-if="selectedStudent.quarterly_goal || selectedStudent.short_term_goal" class="glass rounded-2xl p-5 mt-4">
+                            <h4 class="text-sm font-semibold text-gray-400 mb-3 flex items-center gap-2">
+                                <span class="w-1 h-4 bg-purple-500 rounded-full"></span>CoEvo 目标规划
+                                <span v-if="selectedStudent.project_name" class="text-xs text-gray-600 font-normal">— {{ selectedStudent.project_name }}</span>
+                            </h4>
+                            <div v-if="selectedStudent.quarterly_goal" class="mb-3">
+                                <div class="text-[10px] text-purple-400 mb-1">📋 季度目标</div>
+                                <p class="text-xs text-gray-300 leading-relaxed">{{ selectedStudent.quarterly_goal }}</p>
+                            </div>
+                            <div v-if="selectedStudent.short_term_goal">
+                                <div class="text-[10px] text-ocean-400 mb-1">⚡ 近期目标</div>
+                                <p class="text-xs text-gray-300 leading-relaxed">{{ selectedStudent.short_term_goal }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Student Modal -->
+                <div v-if="showAddStudent" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                     @click.self="showAddStudent = false">
+                    <div class="glass rounded-3xl w-[560px] p-8 animate-slide-up neon-border">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-xl font-bold gradient-text">添加成员</h3>
+                            <button @click="showAddStudent = false" class="text-gray-500 hover:text-white text-2xl">&times;</button>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-xs text-gray-400 mb-1 block">姓名 <span class="text-claw-400">*</span></label>
+                                    <input v-model="newStudent.name" type="text" placeholder="张三"
+                                           class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-gray-400 mb-1 block">学位类型</label>
+                                    <select v-model="newStudent.degree_type"
+                                            class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                                        <option value="phd">博士</option>
+                                        <option value="master">硕士</option>
+                                        <option value="bachelor">本科</option>
+                                        <option value="postdoc">博士后</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">研究方向</label>
+                                <input v-model="newStudent.research_area" type="text" placeholder="大语言模型推理优化"
+                                       class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-xs text-gray-400 mb-1 block">邮箱</label>
+                                    <input v-model="newStudent.email" type="email" placeholder="zhangsan@example.com"
+                                           class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-gray-400 mb-1 block">入学日期</label>
+                                    <input v-model="newStudent.enrollment_date" type="date"
+                                           class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">飞书 Open ID</label>
+                                <input v-model="newStudent.feishu_open_id" type="text" placeholder="ou_xxxxxxxx"
+                                       class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">简介</label>
+                                <textarea v-model="newStudent.bio" rows="2" placeholder="简短介绍学生背景和研究兴趣..."
+                                          class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none resize-none"></textarea>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 mt-6">
+                            <button @click="showAddStudent = false"
+                                    class="flex-1 px-4 py-2.5 rounded-xl border border-dark-border text-gray-400 hover:text-gray-200 text-sm transition-all">
+                                取消
+                            </button>
+                            <button @click="createStudent" :disabled="!newStudent.name.trim() || studentSubmitting"
+                                    class="flex-1 px-4 py-2.5 rounded-xl bg-claw-500 hover:bg-claw-600 disabled:opacity-40 text-sm font-medium transition-all">
+                                {{ studentSubmitting ? '添加中...' : '添加成员' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ====== COLLABORATION NETWORK ====== -->
+            <!-- ====== COLLABORATION NETWORK ====== -->
+            <div v-if="currentTab === 'network'" class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold gradient-text">合作网络</h2>
+                    <button @click="generateCollaborations"
+                            class="px-4 py-2 bg-ocean-500 hover:bg-ocean-600 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                        <span class="animate-pulse-slow">✨</span> AI 生成推荐
+                    </button>
+                </div>
+
+                <!-- Stats Bar -->
+                <div class="grid grid-cols-3 gap-4 mb-6" v-if="networkData.stats && Object.keys(networkData.stats).length">
+                    <div class="glass rounded-xl p-4 text-center">
+                        <div class="text-2xl font-bold text-ocean-400">{{ (networkData.stats.collab_density * 100 || 0).toFixed(0) }}%</div>
+                        <div class="text-xs text-gray-500 mt-1">协作密度</div>
+                    </div>
+                    <div class="glass rounded-xl p-4 text-center">
+                        <div class="text-2xl font-bold text-orange-400">{{ networkData.stats.cross_project_count || 0 }}</div>
+                        <div class="text-xs text-gray-500 mt-1">跨项目连接</div>
+                    </div>
+                    <div class="glass rounded-xl p-4 text-center">
+                        <div class="text-2xl font-bold text-purple-400">{{ networkData.stats.direction_coverage || 0 }}</div>
+                        <div class="text-xs text-gray-500 mt-1">方向覆盖数</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Multi-layer Force Graph -->
+                    <div class="lg:col-span-2 glass rounded-2xl p-4">
+                        <!-- Legend -->
+                        <div class="flex items-center gap-4 mb-3 px-2">
+                            <span class="flex items-center gap-1.5 text-xs text-gray-400">
+                                <span class="w-3 h-3 rounded inline-block bg-ocean-400"></span> 项目
+                            </span>
+                            <span class="flex items-center gap-1.5 text-xs text-gray-400">
+                                <span class="w-3 h-3 rounded-full inline-block bg-emerald-400"></span> 成员
+                            </span>
+                            <span class="flex items-center gap-1.5 text-xs text-gray-400">
+                                <span class="w-3 h-3 rotate-45 inline-block bg-purple-400"></span> 方向
+                            </span>
+                            <span class="text-gray-600">|</span>
+                            <span class="flex items-center gap-1.5 text-xs text-gray-400">
+                                <span class="w-5 h-0.5 inline-block bg-ocean-400"></span> 协作
+                            </span>
+                            <span class="flex items-center gap-1.5 text-xs text-gray-400">
+                                <span class="w-5 h-0.5 inline-block bg-purple-400 border-dashed"></span> 方向关联
+                            </span>
+                            <span class="flex items-center gap-1.5 text-xs text-gray-400">
+                                <span class="w-5 h-0.5 inline-block bg-orange-400"></span> 跨项目
+                            </span>
+                        </div>
+                        <div id="multilayer-network-chart" class="chart-container" style="height: 550px;"></div>
+                    </div>
+                    <!-- Node Detail Panel -->
+                    <div class="glass rounded-2xl p-5 flex flex-col">
+                        <h3 class="text-sm font-semibold text-gray-400 mb-4">节点详情</h3>
+                        <div v-if="selectedNetworkNode" class="flex-1">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold"
+                                     :class="selectedNetworkNode.type==='project'?'bg-ocean-500/20 text-ocean-400':
+                                             selectedNetworkNode.type==='direction'?'bg-purple-500/20 text-purple-400':
+                                             'bg-emerald-500/20 text-emerald-400'">
+                                    {{ selectedNetworkNode.type==='project'?'🏠':selectedNetworkNode.type==='direction'?'🧭':'👤' }}
+                                </div>
+                                <div>
+                                    <div class="font-semibold text-white">{{ selectedNetworkNode.name }}</div>
+                                    <div class="text-xs text-gray-500">{{ {project:'项目',student:'成员',direction:'研究方向'}[selectedNetworkNode.type]||selectedNetworkNode.type }}</div>
+                                </div>
+                            </div>
+                            <div v-if="selectedNetworkNode.type==='student'" class="space-y-2 text-sm">
+                                <div class="flex justify-between p-2 rounded bg-dark-hover">
+                                    <span class="text-gray-500">能力均分</span>
+                                    <span class="text-emerald-400 font-mono">{{ (selectedNetworkNode.capability_avg||0).toFixed(1) }}</span>
+                                </div>
+                                <div v-if="selectedNetworkNode.projects && selectedNetworkNode.projects.length" class="p-2 rounded bg-dark-hover">
+                                    <div class="text-gray-500 text-xs mb-1">参与项目</div>
+                                    <div v-for="p in selectedNetworkNode.projects" :key="p.project_id" class="text-xs text-ocean-400">{{ p.project_name }}</div>
+                                </div>
+                            </div>
+                            <div v-else-if="selectedNetworkNode.type==='project'" class="space-y-2 text-sm">
+                                <div class="flex justify-between p-2 rounded bg-dark-hover">
+                                    <span class="text-gray-500">成员数</span>
+                                    <span class="text-ocean-400 font-mono">{{ selectedNetworkNode.member_count }}</span>
+                                </div>
+                            </div>
+                            <div v-else-if="selectedNetworkNode.type==='direction'" class="space-y-2 text-sm">
+                                <div class="p-2 rounded bg-dark-hover text-xs text-purple-400">{{ selectedNetworkNode.keyword }}</div>
+                            </div>
+                        </div>
+                        <div v-else class="flex-1 flex flex-col items-center justify-center text-gray-600">
+                            <div class="text-4xl mb-3">🔗</div>
+                            <div class="text-sm">点击图中节点查看详情</div>
+                        </div>
+                        <!-- Collab list below -->
+                        <div v-if="collaborations.length > 0" class="mt-4 border-t border-dark-border pt-4">
+                            <h4 class="text-xs text-gray-500 mb-3">协作推荐</h4>
+                            <div class="space-y-2 max-h-[280px] overflow-y-auto">
+                                <div v-for="rec in collaborations.slice(0,6)" :key="rec.id"
+                                     class="p-2.5 rounded-lg bg-dark-hover text-xs">
+                                    <div class="flex items-center gap-1.5 mb-1">
+                                        <span class="text-ocean-400 font-medium">{{ rec.student_a }}</span>
+                                        <span class="text-gray-600">×</span>
+                                        <span class="text-purple-400 font-medium">{{ rec.student_b }}</span>
+                                    </div>
+                                    <div class="text-gray-500 truncate">{{ rec.research_idea }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== RESEARCH DIRECTIONS ====== -->
+            <div v-if="currentTab === 'directions'" class="animate-fade-in">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold gradient-text">研究方向</h2>
+                    <button @click="triggerDirectionAnalyze"
+                            :disabled="directionAnalyzing"
+                            class="px-4 py-2 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded-xl text-sm transition-all flex items-center gap-2 disabled:opacity-50">
+                        {{ directionAnalyzing ? '⏳ 分析中...' : '🤖 立即分析' }}
+                    </button>
+                </div>
+
+                <!-- Sub-nav -->
+                <div class="flex gap-2 mb-6">
+                    <button @click="directionsSubView='graph'"
+                            :class="directionsSubView==='graph' ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' : 'text-gray-400 hover:text-gray-200'"
+                            class="px-4 py-2 rounded-xl text-sm border border-transparent transition-all">
+                        🕸 方向图谱
+                    </button>
+                    <button @click="directionsSubView='international'"
+                            :class="directionsSubView==='international' ? 'bg-ocean-500/20 text-ocean-300 border-ocean-500/30' : 'text-gray-400 hover:text-gray-200'"
+                            class="px-4 py-2 rounded-xl text-sm border border-transparent transition-all">
+                        🌐 国际追踪
+                    </button>
+                    <button @click="directionsSubView='ideas'"
+                            :class="directionsSubView==='ideas' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'text-gray-400 hover:text-gray-200'"
+                            class="px-4 py-2 rounded-xl text-sm border border-transparent transition-all">
+                        💡 待激活 Ideas
+                        <span v-if="pendingIdeasCount > 0"
+                              class="ml-1.5 px-1.5 py-0.5 rounded-full bg-amber-500/30 text-amber-300 text-xs font-mono">{{ pendingIdeasCount }}</span>
+                    </button>
+                </div>
+
+                <!-- Sub-view: Graph -->
+                <div v-if="directionsSubView==='graph'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 glass rounded-2xl p-4">
+                        <h3 class="text-sm font-semibold text-gray-400 mb-2">方向聚类图谱 — 点击节点查看详情</h3>
+                        <div id="direction-force-chart" class="chart-container" style="height: 520px;"></div>
+                    </div>
+                    <div class="glass rounded-2xl p-5">
+                        <div v-if="selectedCluster">
+                            <div class="font-semibold text-white mb-2">{{ selectedCluster.topic }}</div>
+                            <div class="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 inline-block mb-3">{{ selectedCluster.similarity_group }}</div>
+                            <p class="text-sm text-gray-300 leading-relaxed mb-4">{{ selectedCluster.description }}</p>
+                            <div v-if="selectedCluster.keywords && selectedCluster.keywords.length" class="mb-4">
+                                <div class="text-xs text-gray-500 mb-2">关键词</div>
+                                <div class="flex flex-wrap gap-1.5">
+                                    <span v-for="kw in selectedCluster.keywords" :key="kw"
+                                          class="text-xs px-2 py-0.5 rounded-full bg-dark-border text-gray-400">{{ kw }}</span>
+                                </div>
+                            </div>
+                            <div v-if="selectedCluster.related_projects && selectedCluster.related_projects.length" class="mb-4">
+                                <div class="text-xs text-gray-500 mb-2">关联项目</div>
+                                <div v-for="p in selectedCluster.related_projects" :key="p.id" class="text-sm text-ocean-400">{{ p.name }}</div>
+                            </div>
+                            <div v-if="selectedCluster.related_students && selectedCluster.related_students.length" class="mb-4">
+                                <div class="text-xs text-gray-500 mb-2">关联成员</div>
+                                <div class="flex flex-wrap gap-1.5">
+                                    <span v-for="s in selectedCluster.related_students" :key="s.user_id"
+                                          class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">{{ s.username }}</span>
+                                </div>
+                            </div>
+                            <div v-if="selectedCluster.source_evidence" class="mt-3 p-3 rounded-lg bg-dark-hover border-l-2 border-purple-500/40">
+                                <div class="text-xs text-gray-500 mb-1">引用证据</div>
+                                <p class="text-xs text-gray-400 italic">{{ selectedCluster.source_evidence }}</p>
+                            </div>
+                        </div>
+                        <div v-else class="flex flex-col items-center justify-center h-full text-gray-600 py-12">
+                            <div class="text-4xl mb-3">🧭</div>
+                            <div class="text-sm text-center">点击图中节点<br>查看方向详情</div>
+                            <div v-if="directionClusters.length === 0" class="mt-4 text-center text-xs text-gray-600">
+                                暂无聚类数据<br>
+                                <button @click="triggerDirectionAnalyze" class="mt-2 text-purple-400 hover:text-purple-300">触发 AI 分析</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-view: International -->
+                <div v-if="directionsSubView==='international'" class="glass rounded-2xl p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <span class="w-1 h-5 bg-ocean-500 rounded-full"></span>
+                        国际研究追踪
+                    </h3>
+                    <div class="space-y-4">
+                        <div v-for="proj in coevoMomentum" :key="proj.project_id"
+                             class="p-4 rounded-xl bg-dark-hover">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-medium text-white">{{ proj.project_name }}</span>
+                                <span class="text-xs text-gray-500 font-mono">{{ proj.member_count }} 成员</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 text-center text-xs">
+                                <div class="p-2 rounded bg-dark-border/60">
+                                    <div class="text-ocean-400 font-bold text-base">{{ proj.completed_collaborations }}</div>
+                                    <div class="text-gray-500">合作成果</div>
+                                </div>
+                                <div class="p-2 rounded bg-dark-border/60">
+                                    <div class="text-purple-400 font-bold text-base">{{ proj.research_plans }}</div>
+                                    <div class="text-gray-500">研究计划</div>
+                                </div>
+                                <div class="p-2 rounded bg-dark-border/60">
+                                    <div class="text-emerald-400 font-bold text-base">{{ (proj.assessment_coverage * 100).toFixed(0) }}%</div>
+                                    <div class="text-gray-500">能力覆盖</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-if="!coevoMomentum.length" class="text-center py-8 text-gray-500">
+                            <div class="text-3xl mb-2">🌐</div>
+                            加载研究进展数据...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-view: Ideas -->
+                <div v-if="directionsSubView==='ideas'">
+                    <div v-if="directionIdeas.filter(i=>i.status==='pending').length === 0" class="glass rounded-2xl p-8 text-center text-gray-500">
+                        <div class="text-4xl mb-3">💡</div>
+                        <div>暂无待激活的研究方向 Idea</div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div v-for="idea in directionIdeas.filter(i=>i.status==='pending')" :key="idea.id"
+                             class="glass rounded-2xl p-5 border border-amber-500/10 hover:border-amber-500/30 transition-all">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                                    {{ idea.inspiration_source === 'international_trend' ? '🌐 国际前沿' : '🔍 Gap 分析' }}
+                                </span>
+                                <span v-if="idea.cluster" class="text-xs text-purple-400">↔ {{ idea.cluster.topic }}</span>
+                            </div>
+                            <h4 class="font-semibold text-white mb-2">{{ idea.title }}</h4>
+                            <p class="text-sm text-gray-400 mb-4 leading-relaxed">{{ idea.description }}</p>
+                            <div class="flex gap-2 justify-end">
+                                <button @click="dismissIdea(idea.id)"
+                                        class="px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all">
+                                    忽略
+                                </button>
+                                <button @click="activateIdea(idea.id)"
+                                        class="px-3 py-1.5 rounded-lg text-xs bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-all font-medium">
+                                    ✓ 激活方向
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== TEAM BENCHMARK ====== -->
+            <div v-if="currentTab === 'benchmark'" class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold gradient-text">团队对标</h2>
+                    <button @click="loadInnovationIndex"
+                            class="px-4 py-2 bg-ocean-500/20 text-ocean-400 hover:bg-ocean-500/30 rounded-xl text-sm transition-all">
+                        🔄 刷新指数
+                    </button>
+                </div>
+
+                <!-- Innovation Index Cards -->
+                <div class="mb-6">
+                    <h3 class="text-sm font-semibold text-gray-400 mb-4 flex items-center gap-2">
+                        <span class="w-1 h-4 bg-emerald-500 rounded-full"></span>
+                        项目创新指数
+                    </h3>
+                    <div v-if="innovationIndex.length === 0" class="text-center py-8 text-gray-500">
+                        <div class="text-3xl mb-2">📈</div>
+                        加载创新指数中...
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                        <div v-for="proj in innovationIndex" :key="proj.project_id"
+                             class="glass rounded-2xl p-5 glass-hover transition-all">
+                            <div class="flex items-start justify-between mb-4">
+                                <div>
+                                    <div class="font-semibold text-white">{{ proj.project_name }}</div>
+                                    <div class="text-xs text-gray-500 mt-0.5 font-mono">{{ proj.member_count }} 成员</div>
+                                </div>
+                                <div :id="'innovation-gauge-' + proj.project_id" style="width:80px;height:80px;"></div>
+                            </div>
+                            <!-- Component mini-bars -->
+                            <div class="space-y-2">
+                                <div v-for="[key, label] in [['meeting_velocity','会议活跃度'],['collab_density','协作密度'],['blocker_resolution','障碍解决率'],['direction_breadth','方向广度']]"
+                                     :key="key" class="flex items-center gap-2">
+                                    <span class="text-[10px] text-gray-500 w-16 shrink-0">{{ label }}</span>
+                                    <div class="flex-1 h-1.5 bg-dark-border rounded-full overflow-hidden">
+                                        <div class="h-full rounded-full transition-all"
+                                             :class="proj.components[key] >= 70 ? 'bg-emerald-500' : proj.components[key] >= 40 ? 'bg-amber-500' : 'bg-red-500'"
+                                             :style="{ width: proj.components[key] + '%' }"></div>
+                                    </div>
+                                    <span class="text-[10px] font-mono w-6 text-gray-400">{{ proj.components[key].toFixed(0) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Team Health Radar -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass rounded-2xl p-6 flex flex-col items-center">
+                        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2 self-start">
+                            <span class="w-1 h-5 bg-emerald-500 rounded-full"></span>
+                            团队健康指数
+                        </h3>
+                        <div id="health-gauge" style="width:260px;height:200px;"></div>
+                        <div v-if="teamHealth" class="grid grid-cols-2 gap-3 mt-2 w-full">
+                            <div class="text-center p-2 rounded-lg bg-dark-hover">
+                                <div class="text-xs text-gray-500">风险控制</div>
+                                <div class="text-lg font-bold" :class="teamHealth.components.risk_health >= 60 ? 'text-emerald-400' : 'text-amber-400'">
+                                    {{ teamHealth.components.risk_health.toFixed(0) }}
+                                </div>
+                            </div>
+                            <div class="text-center p-2 rounded-lg bg-dark-hover">
+                                <div class="text-xs text-gray-500">参与度</div>
+                                <div class="text-lg font-bold" :class="teamHealth.components.engagement_health >= 60 ? 'text-emerald-400' : 'text-amber-400'">
+                                    {{ teamHealth.components.engagement_health.toFixed(0) }}
+                                </div>
+                            </div>
+                            <div class="text-center p-2 rounded-lg bg-dark-hover">
+                                <div class="text-xs text-gray-500">阻塞解决</div>
+                                <div class="text-lg font-bold" :class="teamHealth.components.blocker_resolution >= 60 ? 'text-emerald-400' : 'text-amber-400'">
+                                    {{ teamHealth.components.blocker_resolution.toFixed(0) }}
+                                </div>
+                            </div>
+                            <div class="text-center p-2 rounded-lg bg-dark-hover">
+                                <div class="text-xs text-gray-500">协作活跃</div>
+                                <div class="text-lg font-bold" :class="teamHealth.components.collaboration_activity >= 60 ? 'text-emerald-400' : 'text-amber-400'">
+                                    {{ teamHealth.components.collaboration_activity.toFixed(0) }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Research Momentum -->
+                    <div class="glass rounded-2xl p-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <span class="w-1 h-5 bg-ocean-500 rounded-full"></span>
+                            研究进展动力
+                        </h3>
+                        <div class="space-y-3">
+                            <div v-for="proj in coevoMomentum" :key="proj.project_id"
+                                 class="p-3 rounded-xl bg-dark-hover">
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="font-medium text-white">{{ proj.project_name }}</span>
+                                    <span class="text-gray-500 font-mono text-xs">{{ proj.member_count }} 人</span>
+                                </div>
+                                <div class="flex gap-3 text-xs text-gray-500">
+                                    <span class="text-emerald-400">✓ {{ proj.completed_collaborations }} 协作</span>
+                                    <span class="text-ocean-400">📋 {{ proj.research_plans }} 计划</span>
+                                    <span class="text-purple-400">📊 {{ (proj.assessment_coverage * 100).toFixed(0) }}% 覆盖</span>
+                                </div>
+                            </div>
+                            <div v-if="!coevoMomentum.length" class="text-center py-4 text-gray-600 text-sm">暂无数据</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== MEETINGS ====== -->
+            <div v-if="currentTab === 'meetings'" class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold gradient-text">会议中心</h2>
+                    <div class="flex gap-2">
+                        <span class="text-xs px-3 py-1.5 bg-purple-500/10 text-purple-400 rounded-xl font-mono">📡 CoEvo 实时数据</span>
+                        <button @click="showAddMeeting = true"
+                                class="px-4 py-2 bg-claw-500 hover:bg-claw-600 rounded-xl text-sm font-medium transition-all">
+                            + 新会议
+                        </button>
+                    </div>
+                </div>
+                <!-- Meeting detail panel for CoEvo meetings -->
+                <div v-if="selectedMeeting && selectedMeeting._source === 'coevo'" class="glass rounded-2xl p-6 mb-6 animate-slide-up">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold text-white">{{ selectedMeeting.title }}</h3>
+                            <p class="text-sm text-gray-500 font-mono mt-1">{{ selectedMeeting.date_display }}</p>
+                        </div>
+                        <button @click="selectedMeeting=null" class="text-gray-500 hover:text-white text-2xl">&times;</button>
+                    </div>
+                    <div v-if="selectedMeeting.overall_summary" class="p-4 rounded-xl bg-purple-500/5 border border-purple-500/15 mb-4">
+                        <div class="text-xs text-purple-400 mb-1">🤖 CoEvo AI 会议总结</div>
+                        <p class="text-sm text-gray-300 leading-relaxed">{{ selectedMeeting.overall_summary }}</p>
+                    </div>
+                    <div class="text-xs text-gray-600">点击右上角关闭，或在 CoEvo 详情中查看完整学生报告</div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    <div v-for="meeting in meetings" :key="meeting.id"
+                         class="glass rounded-2xl p-5 glass-hover transition-all duration-300 cursor-pointer"
+                         :class="selectedMeeting?.id === meeting.id ? 'border border-claw-500/40' : ''"
+                         @click="selectMeeting(meeting)">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs px-2 py-0.5 rounded-full"
+                                  :class="{
+                                      'bg-blue-500/20 text-blue-400': meeting.meeting_type === 'group',
+                                      'bg-green-500/20 text-green-400': meeting.meeting_type === 'individual',
+                                      'bg-purple-500/20 text-purple-400': meeting.meeting_type === 'seminar',
+                                      'bg-ocean-500/20 text-ocean-400': !meeting.meeting_type,
+                                  }">{{ meeting.type_label || '组会' }}</span>
+                            <div class="flex items-center gap-2">
+                                <span v-if="meeting._source==='coevo'" class="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">CoEvo</span>
+                                <span class="text-xs text-gray-500 font-mono">{{ meeting.date_display }}</span>
+                            </div>
+                        </div>
+                        <h4 class="text-base font-semibold text-white mb-2">{{ meeting.title }}</h4>
+                        <p v-if="meeting.summary || meeting.overall_summary" class="text-sm text-gray-400 line-clamp-2">{{ meeting.summary || meeting.overall_summary }}</p>
+                        <p v-else class="text-sm text-gray-600">暂无摘要</p>
+                        <div v-if="meeting.action_items?.length" class="mt-3 flex items-center gap-2">
+                            <span class="text-xs text-amber-400">📋 {{ meeting.action_items.length }} 项待办</span>
+                        </div>
+                        <div v-if="meeting.status" class="mt-2">
+                            <span class="text-[10px] px-2 py-0.5 rounded-full"
+                                  :class="meeting.status==='completed'?'bg-emerald-500/20 text-emerald-400':meeting.status==='in_progress'?'bg-amber-500/20 text-amber-400':'bg-gray-500/20 text-gray-400'">
+                                {{ {completed:'已完成',in_progress:'进行中',notified:'已通知',draft:'草稿'}[meeting.status]||meeting.status }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== FEISHU (now inside data tab) ====== -->
+            <div v-if="false && currentTab === 'feishu'" class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold gradient-text">飞书对话记录</h2>
+                    <div class="flex items-center gap-3">
+                        <!-- Filter -->
+                        <div class="flex rounded-xl overflow-hidden border border-dark-border">
+                            <button v-for="opt in [{v:'all',l:'全部'},{v:'feishu',l:'飞书'},{v:'web',l:'Web'}]" :key="opt.v"
+                                    @click="feishuFilter = opt.v"
+                                    :class="['px-3 py-1.5 text-xs transition-all', feishuFilter === opt.v ? 'bg-claw-500/20 text-claw-400' : 'text-gray-400 hover:text-gray-200']">
+                                {{ opt.l }}
+                            </button>
+                        </div>
+                        <!-- Auto-refresh toggle -->
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <div class="relative">
+                                <input type="checkbox" v-model="feishuAutoRefresh" class="sr-only">
+                                <div class="w-8 h-4 rounded-full transition-colors" :class="feishuAutoRefresh ? 'bg-claw-500' : 'bg-dark-border'"></div>
+                                <div class="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all" :class="feishuAutoRefresh ? 'left-4.5' : 'left-0.5'"></div>
+                            </div>
+                            <span class="text-xs text-gray-400">自动刷新</span>
+                        </label>
+                        <button @click="loadFeishuLogs"
+                                class="px-3 py-1.5 bg-dark-hover rounded-xl text-xs text-gray-400 hover:text-gray-200 transition-all">
+                            ↻ 刷新
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Log feed -->
+                <div class="space-y-4">
+                    <div v-if="feishuLogs.length === 0" class="glass rounded-2xl p-10 text-center text-gray-500">
+                        <div class="text-4xl mb-3">💬</div>
+                        <p class="text-sm">暂无对话记录</p>
+                    </div>
+                    <div v-for="log in feishuLogs" :key="log.task_id"
+                         class="glass rounded-2xl p-5 glass-hover transition-all duration-300">
+                        <div class="flex items-center gap-3 mb-3">
+                            <span class="text-lg">{{ SOURCE_ICONS[log.source] || '📩' }}</span>
+                            <span class="text-xs font-mono text-gray-500">{{ log.user_id }}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full ml-1" :class="STATUS_COLORS[log.status] || 'bg-gray-500/20 text-gray-400'">
+                                {{ log.status }}
+                            </span>
+                            <span v-if="log.skill_used" class="text-xs px-2 py-0.5 rounded-full bg-ocean-500/10 text-ocean-400">
+                                {{ log.skill_used }}
+                            </span>
+                            <span v-if="log.duration_ms" class="ml-auto text-xs text-gray-600 font-mono">{{ log.duration_ms }}ms</span>
+                            <span class="text-xs text-gray-600 font-mono" :class="log.duration_ms ? '' : 'ml-auto'">{{ log.created_at?.replace('T', ' ').slice(0, 16) }}</span>
+                        </div>
+
+                        <!-- User message -->
+                        <div class="flex justify-end mb-2">
+                            <div class="max-w-[75%] bg-gradient-to-br from-claw-500/20 to-claw-700/20 border border-claw-500/20 rounded-2xl rounded-tr-sm px-4 py-2.5">
+                                <p class="text-sm text-gray-200 leading-relaxed">{{ log.input_text }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Bot response -->
+                        <div v-if="log.result_summary" class="flex justify-start">
+                            <div class="max-w-[75%] glass border border-dark-border rounded-2xl rounded-tl-sm px-4 py-2.5">
+                                <p class="text-xs text-ocean-400 mb-1 font-mono">🤖 AI 响应</p>
+                                <p class="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{{ log.result_summary }}</p>
+                            </div>
+                        </div>
+                        <div v-else-if="log.status === 'queued' || log.status === 'processing'" class="flex justify-start">
+                            <div class="glass border border-dark-border rounded-2xl rounded-tl-sm px-4 py-2.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                                    <span class="text-xs text-gray-500">处理中...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else-if="log.error_message" class="flex justify-start">
+                            <div class="glass border border-red-500/20 rounded-2xl rounded-tl-sm px-4 py-2.5">
+                                <p class="text-xs text-red-400">{{ log.error_message }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== AI CHAT ====== -->
+            <div v-if="currentTab === 'chat'" class="animate-fade-in flex flex-col" style="height: calc(100vh - 6rem);">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-2xl font-bold gradient-text">AI 助手</h2>
+                        <span class="text-xs text-gray-500 font-mono">Powered by OpenClaw</span>
+                    </div>
+                    <!-- 活跃任务气泡 -->
+                    <div class="flex items-center gap-2">
+                        <span v-if="chatMessages.filter(m=>m.status==='processing').length"
+                              class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-claw-500/15 text-claw-400 border border-claw-500/20">
+                            <span class="w-1.5 h-1.5 rounded-full bg-claw-400 animate-pulse"></span>
+                            {{ chatMessages.filter(m=>m.status==='processing').length }} 个处理中
+                        </span>
+                        <span v-if="chatMessages.filter(m=>m.status==='queued').length"
+                              class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            ⏳ {{ chatMessages.filter(m=>m.status==='queued').length }} 个排队
+                        </span>
+                        <button @click="chatMessages=[]" v-if="chatMessages.length"
+                                class="text-xs text-gray-600 hover:text-gray-400 px-2 py-1 rounded-lg hover:bg-dark-hover transition-all">
+                            清空
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chat Messages -->
+                <div class="flex-1 glass rounded-2xl p-6 overflow-y-auto mb-4 space-y-4" ref="chatContainer">
+                    <div v-if="chatMessages.length === 0" class="flex flex-col items-center justify-center h-full text-center">
+                        <div class="text-6xl mb-4 animate-float">🦞</div>
+                        <h3 class="text-xl font-bold gradient-text mb-2">TeamLab AI 助手</h3>
+                        <p class="text-gray-500 text-sm max-w-md">我可以帮你查看学生进展、推荐合作、分析研究方向、整理会议纪要...试试对我说：</p>
+                        <div class="flex flex-wrap gap-2 mt-4 justify-center">
+                            <button v-for="hint in chatHints" :key="hint"
+                                    @click="sendChat(hint)"
+                                    class="text-xs px-3 py-1.5 rounded-full border border-dark-border text-gray-400 hover:border-claw-500/50 hover:text-claw-400 transition-all">
+                                {{ hint }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-for="(msg, i) in chatMessages" :key="i"
+                         :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+
+                        <!-- User message -->
+                        <div v-if="msg.role === 'user'"
+                             class="max-w-[70%] rounded-2xl px-5 py-3 bg-gradient-to-br from-claw-500 to-claw-700 text-white">
+                            <div class="text-sm leading-relaxed whitespace-pre-wrap">{{ msg.content }}</div>
+                            <div class="text-[10px] mt-1 text-claw-200">{{ msg.time }}</div>
+                        </div>
+
+                        <!-- Assistant message (with queue/progress states) -->
+                        <div v-else class="max-w-[75%] glass border rounded-2xl px-5 py-4"
+                             :class="{
+                                 'border-dark-border': msg.status === 'completed' || !msg.status,
+                                 'border-claw-500/30': msg.status === 'processing',
+                                 'border-amber-500/30': msg.status === 'queued' || msg.status === 'submitting',
+                                 'border-red-500/30': msg.status === 'failed',
+                             }">
+
+                            <!-- Queued / submitting state -->
+                            <div v-if="msg.status === 'queued' || msg.status === 'submitting'" class="space-y-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+                                    <span class="text-xs text-amber-400 font-medium">
+                                        {{ msg.status === 'submitting' ? '提交中...' : '排队等待中' }}
+                                    </span>
+                                    <span v-if="msg.queue_position" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">
+                                        第 {{ msg.queue_position }} 位
+                                    </span>
+                                </div>
+                                <div v-if="msg.eta_countdown > 0" class="flex items-center gap-2">
+                                    <div class="flex-1 bg-dark-border rounded-full h-1">
+                                        <div class="h-1 rounded-full bg-amber-400/50 transition-all" style="width: 100%"></div>
+                                    </div>
+                                    <span class="text-[10px] text-gray-500 font-mono shrink-0">约 {{ msg.eta_countdown }}s</span>
+                                </div>
+                            </div>
+
+                            <!-- Processing state with progress bar -->
+                            <div v-else-if="msg.status === 'processing'" class="space-y-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-claw-400 animate-pulse shrink-0"></span>
+                                    <span class="text-xs text-claw-400 font-medium">处理中</span>
+                                    <span v-if="msg.progress?.step" class="text-[10px] text-gray-500 font-mono">
+                                        {{ {
+                                            started: '已启动',
+                                            skill_loaded: '技能已加载',
+                                            context_loading: '加载团队数据',
+                                            context_loaded: '上下文就绪',
+                                            llm_thinking: 'AI 思考中',
+                                            tool_call: '工具调用',
+                                            synthesizing: '整理回答',
+                                            completed: '完成',
+                                            dispatching: '分配任务',
+                                        }[msg.progress?.step] || msg.progress?.step }}
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="flex-1 bg-dark-border rounded-full h-1.5 overflow-hidden">
+                                        <div class="h-1.5 rounded-full bg-gradient-to-r from-claw-500 to-ocean-400 transition-all duration-500"
+                                             :style="{ width: (msg.progress?.percent || 5) + '%' }"></div>
+                                    </div>
+                                    <span class="text-[10px] text-gray-600 font-mono shrink-0">{{ msg.progress?.percent || 0 }}%</span>
+                                </div>
+                                <p v-if="msg.progress?.detail" class="text-xs text-gray-500 italic">{{ msg.progress.detail }}</p>
+                            </div>
+
+                            <!-- Completed state -->
+                            <div v-else-if="msg.status === 'completed' || (!msg.status && msg.content)">
+                                <div v-if="msg.skill" class="flex items-center gap-2 mb-2">
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-ocean-500/10 text-ocean-400 font-mono">{{ msg.skill }}</span>
+                                    <span v-if="msg.duration_ms" class="text-[10px] text-gray-600 font-mono">{{ (msg.duration_ms/1000).toFixed(1) }}s</span>
+                                </div>
+                                <div class="text-sm leading-relaxed whitespace-pre-wrap text-gray-200">{{ msg.content }}</div>
+                            </div>
+
+                            <!-- Failed state -->
+                            <div v-else-if="msg.status === 'failed'" class="flex items-start gap-2">
+                                <span class="text-red-400 mt-0.5">⚠</span>
+                                <div class="text-sm text-red-300 leading-relaxed">{{ msg.content || '处理失败，请重试。' }}</div>
+                            </div>
+
+                            <div class="text-[10px] mt-2 text-gray-600">{{ msg.time }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Input -->
+                <div class="glass rounded-2xl p-4 flex items-center gap-3">
+                    <input v-model="chatInput"
+                           @keydown.enter="sendChat(chatInput)"
+                           type="text"
+                           placeholder="输入你的问题...（例如：张三最近的科研进展如何？）"
+                           class="flex-1 bg-dark-input text-gray-200 rounded-xl px-4 py-3 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none focus:ring-1 focus:ring-claw-500/20 transition-all placeholder:text-gray-600">
+                    <button @click="sendChat(chatInput)"
+                            :disabled="!chatInput?.trim()"
+                            class="px-6 py-3 bg-gradient-to-r from-claw-500 to-claw-600 hover:from-claw-600 hover:to-claw-700 disabled:opacity-30 rounded-xl text-sm font-medium transition-all whitespace-nowrap">
+                        发送 ↗
+                    </button>
+                </div>
+            </div>
+
+            <!-- ====== GLOBAL MODALS ====== -->
+
+            <!-- Add Direction Modal -->
+            <div v-if="showAddDirection" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                 @click.self="showAddDirection = false">
+                <div class="glass rounded-3xl w-[520px] p-8 animate-slide-up neon-border">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-xl font-bold gradient-text">添加研究方向</h3>
+                        <button @click="showAddDirection = false" class="text-gray-500 hover:text-white text-2xl">&times;</button>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">方向名称 <span class="text-claw-400">*</span></label>
+                            <input v-model="newDirection.title" type="text" placeholder="多模态大语言模型推理"
+                                   class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">描述</label>
+                            <textarea v-model="newDirection.description" rows="2" placeholder="方向的核心思路和研究目标..."
+                                      class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none resize-none"></textarea>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">来源</label>
+                                <select v-model="newDirection.source"
+                                        class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                                    <option value="pi_defined">PI 定义</option>
+                                    <option value="ai_suggested">AI 建议</option>
+                                    <option value="meeting_derived">会议衍生</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">状态</label>
+                                <select v-model="newDirection.status"
+                                        class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                                    <option value="active">进行中</option>
+                                    <option value="exploring">探索中</option>
+                                    <option value="inactive">已停止</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">证据/背景</label>
+                            <textarea v-model="newDirection.evidence" rows="2" placeholder="为什么提出这个方向？有什么依据..."
+                                      class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none resize-none"></textarea>
+                        </div>
+                    </div>
+                    <div class="flex gap-3 mt-6">
+                        <button @click="showAddDirection = false"
+                                class="flex-1 px-4 py-2.5 rounded-xl border border-dark-border text-gray-400 hover:text-gray-200 text-sm transition-all">
+                            取消
+                        </button>
+                        <button @click="createDirection" :disabled="!newDirection.title.trim() || directionSubmitting"
+                                class="flex-1 px-4 py-2.5 rounded-xl bg-claw-500 hover:bg-claw-600 disabled:opacity-40 text-sm font-medium transition-all">
+                            {{ directionSubmitting ? '添加中...' : '添加方向' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Meeting Modal -->
+            <div v-if="showAddMeeting" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                 @click.self="showAddMeeting = false">
+                <div class="glass rounded-3xl w-[560px] p-8 animate-slide-up neon-border">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-xl font-bold gradient-text">记录会议</h3>
+                        <button @click="showAddMeeting = false" class="text-gray-500 hover:text-white text-2xl">&times;</button>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">会议标题</label>
+                            <input v-model="newMeeting.title" type="text" placeholder="第46次组会：前沿进展分享"
+                                   class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">会议类型 <span class="text-claw-400">*</span></label>
+                                <select v-model="newMeeting.meeting_type"
+                                        class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                                    <option value="group">组会</option>
+                                    <option value="individual">一对一</option>
+                                    <option value="seminar">研讨会</option>
+                                    <option value="defense">答辩</option>
+                                    <option value="other">其他</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">时间 <span class="text-claw-400">*</span></label>
+                                <input v-model="newMeeting.meeting_date" type="datetime-local"
+                                       class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">参会者（逗号分隔）</label>
+                            <input v-model="newMeeting.attendees_text" type="text" placeholder="张三, 李四, 王五"
+                                   class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">会议记录（AI 将自动生成摘要）</label>
+                            <textarea v-model="newMeeting.raw_notes" rows="4" placeholder="粘贴或输入会议记录、讨论内容..."
+                                      class="w-full bg-dark-input text-gray-200 rounded-xl px-4 py-2.5 text-sm border border-dark-border focus:border-claw-500/50 focus:outline-none resize-none"></textarea>
+                        </div>
+                    </div>
+                    <div class="flex gap-3 mt-6">
+                        <button @click="showAddMeeting = false"
+                                class="flex-1 px-4 py-2.5 rounded-xl border border-dark-border text-gray-400 hover:text-gray-200 text-sm transition-all">
+                            取消
+                        </button>
+                        <button @click="createMeeting" :disabled="!newMeeting.meeting_date || meetingSubmitting"
+                                class="flex-1 px-4 py-2.5 rounded-xl bg-claw-500 hover:bg-claw-600 disabled:opacity-40 text-sm font-medium transition-all">
+                            {{ meetingSubmitting ? '保存中...' : '保存会议' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meeting Detail Modal -->
+            <div v-if="selectedMeeting" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                 @click.self="selectedMeeting = null">
+                <div class="glass rounded-3xl w-[700px] max-h-[85vh] overflow-y-auto p-8 animate-slide-up neon-border">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-white">{{ selectedMeeting.title || '会议详情' }}</h3>
+                            <p class="text-sm text-gray-400 mt-0.5 font-mono">{{ selectedMeeting.meeting_date || selectedMeeting.date_display }}</p>
+                        </div>
+                        <button @click="selectedMeeting = null" class="text-gray-500 hover:text-white text-2xl">&times;</button>
+                    </div>
+
+                    <div class="flex gap-2 mb-5">
+                        <span class="text-xs px-2 py-0.5 rounded-full"
+                              :class="{
+                                  'bg-blue-500/20 text-blue-400': selectedMeeting.meeting_type === 'group',
+                                  'bg-green-500/20 text-green-400': selectedMeeting.meeting_type === 'individual',
+                                  'bg-purple-500/20 text-purple-400': selectedMeeting.meeting_type === 'seminar',
+                              }">{{ selectedMeeting.type_label || selectedMeeting.meeting_type }}</span>
+                        <span v-if="selectedMeeting.attendees?.length" class="text-xs px-2 py-0.5 rounded-full bg-dark-border text-gray-400">
+                            👥 {{ Array.isArray(selectedMeeting.attendees) ? selectedMeeting.attendees.join(', ') : selectedMeeting.attendees }}
+                        </span>
+                    </div>
+
+                    <!-- Summary -->
+                    <div v-if="selectedMeeting.summary" class="glass rounded-2xl p-5 mb-4">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2 flex items-center gap-1">
+                            <span>🤖</span> AI 摘要
+                        </h4>
+                        <p class="text-sm text-gray-300 leading-relaxed">{{ selectedMeeting.summary }}</p>
+                    </div>
+
+                    <!-- Topics -->
+                    <div v-if="selectedMeeting.topics?.length" class="glass rounded-2xl p-5 mb-4">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-3">讨论议题</h4>
+                        <ul class="space-y-2">
+                            <li v-for="(topic, i) in selectedMeeting.topics" :key="i"
+                                class="flex items-start gap-2 text-sm text-gray-300">
+                                <span class="text-claw-400 font-bold shrink-0">{{ i + 1 }}.</span>
+                                <span>{{ typeof topic === 'object' ? topic.title || topic : topic }}</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Action Items -->
+                    <div v-if="selectedMeeting.action_items?.length" class="glass rounded-2xl p-5 mb-4">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-3">📋 行动项</h4>
+                        <ul class="space-y-2">
+                            <li v-for="(item, i) in selectedMeeting.action_items" :key="i"
+                                class="flex items-start gap-3 text-sm">
+                                <span class="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-bold shrink-0">{{ i + 1 }}</span>
+                                <span class="text-gray-300">{{ typeof item === 'object' ? item.task || item : item }}</span>
+                                <span v-if="item.assignee" class="ml-auto text-xs text-gray-500 shrink-0">→ {{ item.assignee }}</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Raw Notes -->
+                    <div v-if="selectedMeeting.raw_notes" class="glass rounded-2xl p-5">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2">原始记录</h4>
+                        <pre class="text-xs text-gray-400 whitespace-pre-wrap leading-relaxed">{{ selectedMeeting.raw_notes }}</pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== DATA HUB (CoEvo + Feishu) ====== -->
+            <div v-if="currentTab === 'data' || currentTab === 'feishu'" class="animate-fade-in">
+                <!-- Sub-tab for data vs feishu -->
+                <div v-if="currentTab === 'data'" class="flex gap-2 mb-4">
+                    <button @click="dataSubTab='coevo'"
+                            :class="dataSubTab!=='feishu' ? 'bg-claw-500/20 text-claw-400 border-claw-500/30' : 'text-gray-400'"
+                            class="px-4 py-2 rounded-xl text-sm border border-transparent transition-all">
+                        🔄 CoEvo 数据
+                    </button>
+                    <button @click="dataSubTab='feishu'; loadFeishuLogs(); startFeishuAutoRefresh()"
+                            :class="dataSubTab==='feishu' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'text-gray-400'"
+                            class="px-4 py-2 rounded-xl text-sm border border-transparent transition-all">
+                        💬 飞书对话
+                    </button>
+                </div>
+
+                <!-- Feishu sub-view -->
+                <div v-if="dataSubTab === 'feishu'">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-bold gradient-text">飞书对话记录</h2>
+                        <div class="flex items-center gap-3">
+                            <div class="flex rounded-xl overflow-hidden border border-dark-border">
+                                <button v-for="opt in [{v:'all',l:'全部'},{v:'feishu',l:'飞书'},{v:'web',l:'Web'}]" :key="opt.v"
+                                        @click="feishuFilter = opt.v"
+                                        :class="['px-3 py-1.5 text-xs transition-all', feishuFilter === opt.v ? 'bg-claw-500/20 text-claw-400' : 'text-gray-400 hover:text-gray-200']">
+                                    {{ opt.l }}
+                                </button>
+                            </div>
+                            <button @click="loadFeishuLogs" class="px-3 py-1.5 bg-dark-hover rounded-xl text-xs text-gray-400 hover:text-gray-200 transition-all">↻ 刷新</button>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div v-if="feishuLogs.length === 0" class="glass rounded-2xl p-10 text-center text-gray-500">
+                            <div class="text-4xl mb-3">💬</div>
+                            <p class="text-sm">暂无对话记录</p>
+                        </div>
+                        <div v-for="log in feishuLogs" :key="log.task_id" class="glass rounded-2xl p-5 glass-hover transition-all duration-300">
+                            <div class="flex items-center gap-3 mb-3">
+                                <span class="text-lg">{{ SOURCE_ICONS[log.source] || '📩' }}</span>
+                                <span class="text-xs font-mono text-gray-500">{{ log.user_id }}</span>
+                                <span class="text-xs px-2 py-0.5 rounded-full ml-1" :class="STATUS_COLORS[log.status] || 'bg-gray-500/20 text-gray-400'">{{ log.status }}</span>
+                                <span v-if="log.skill_used" class="text-xs px-2 py-0.5 rounded-full bg-ocean-500/10 text-ocean-400">{{ log.skill_used }}</span>
+                                <span class="ml-auto text-xs text-gray-600 font-mono">{{ log.created_at?.replace('T', ' ').slice(0, 16) }}</span>
+                            </div>
+                            <div class="flex justify-end mb-2">
+                                <div class="max-w-[75%] bg-gradient-to-br from-claw-500/20 to-claw-700/20 border border-claw-500/20 rounded-2xl rounded-tr-sm px-4 py-2.5">
+                                    <p class="text-sm text-gray-200 leading-relaxed">{{ log.input_text }}</p>
+                                </div>
+                            </div>
+                            <div v-if="log.result_summary" class="flex justify-start">
+                                <div class="max-w-[75%] glass border border-dark-border rounded-2xl rounded-tl-sm px-4 py-2.5">
+                                    <p class="text-xs text-ocean-400 mb-1 font-mono">🤖 AI 响应</p>
+                                    <p class="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{{ log.result_summary }}</p>
+                                </div>
+                            </div>
+                            <div v-else-if="log.error_message" class="flex justify-start">
+                                <div class="glass border border-red-500/20 rounded-2xl rounded-tl-sm px-4 py-2.5">
+                                    <p class="text-xs text-red-400">{{ log.error_message }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CoEvo sub-view -->
+                <div v-if="dataSubTab !== 'feishu'">
+
+                <!-- Header -->
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold gradient-text">CoEvo 数据中台</h2>
+                        <p class="text-xs text-gray-500 mt-0.5 font-mono">实时读取 cognalign-coevo prod · 只读模式 · openclaw 独立分析层</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex bg-dark-card rounded-xl p-1 gap-1">
+                            <button v-for="v in [{id:'overview',label:'总览'},{id:'projects',label:'项目'},{id:'students',label:'成员'},{id:'meetings',label:'会议'},{id:'analytics',label:'分析'}]"
+                                    :key="v.id" @click="coevoActiveView = v.id"
+                                    :class="['px-3 py-1.5 rounded-lg text-xs font-medium transition-all', coevoActiveView===v.id ? 'bg-claw-500/20 text-claw-400' : 'text-gray-500 hover:text-gray-300']">
+                                {{ v.label }}
+                            </button>
+                        </div>
+                        <button @click="triggerCoevoSync" :disabled="coevoSyncing"
+                                class="px-4 py-2 bg-ocean-600/20 hover:bg-ocean-600/30 border border-ocean-500/30 text-ocean-400 rounded-xl text-xs font-medium transition-all disabled:opacity-50">
+                            {{ coevoSyncing ? '⏳ 同步中...' : '🔄 同步学生数据' }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Loading -->
+                <div v-if="coevoLoading && !coevoOverview" class="flex items-center justify-center h-64">
+                    <div class="text-center">
+                        <div class="w-12 h-12 border-4 border-claw-500/30 border-t-claw-500 rounded-full animate-spin mx-auto mb-3"></div>
+                        <p class="text-gray-500 text-sm">正在连接 CoEvo prod 数据库...</p>
+                    </div>
+                </div>
+
+                <!-- ── Overview ── -->
+                <div v-if="coevoActiveView === 'overview' && coevoOverview">
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+                        <div class="glass rounded-2xl p-4"><div class="text-xs text-gray-500 mb-1">项目总数</div><div class="text-3xl font-bold">{{ coevoOverview.coevo_stats?.total_projects||0 }}</div><div class="text-[10px] text-ocean-400 mt-1">CoEvo 活跃</div></div>
+                        <div class="glass rounded-2xl p-4"><div class="text-xs text-gray-500 mb-1">成员总数</div><div class="text-3xl font-bold">{{ coevoOverview.coevo_stats?.total_members||0 }}</div><div class="text-[10px] text-ocean-400 mt-1">跨所有项目</div></div>
+                        <div class="glass rounded-2xl p-4"><div class="text-xs text-gray-500 mb-1">会议总数</div><div class="text-3xl font-bold">{{ coevoOverview.coevo_stats?.total_meetings||0 }}</div><div class="text-[10px] text-emerald-400 mt-1">已完成: {{ coevoOverview.coevo_stats?.completed_meetings||0 }}</div></div>
+                        <div class="glass rounded-2xl p-4"><div class="text-xs text-gray-500 mb-1">已同步学生</div><div class="text-3xl font-bold text-claw-400">{{ coevoOverview.openclaw_enrichment?.synced_students||0 }}</div><div class="text-[10px] text-gray-500 mt-1">openclaw 已建档</div></div>
+                        <div class="glass rounded-2xl p-4"><div class="text-xs text-gray-500 mb-1">AI 洞察</div><div class="text-3xl font-bold text-purple-400">{{ coevoOverview.openclaw_enrichment?.meeting_insights||0 }}</div><div class="text-[10px] text-gray-500 mt-1">openclaw 生成</div></div>
+                        <div class="glass rounded-2xl p-4"><div class="text-xs text-gray-500 mb-1">上次同步</div><div class="text-sm font-medium text-gray-300 mt-1 leading-tight">{{ coevoOverview.openclaw_enrichment?.last_sync_at?.slice(0,16)||'未同步' }}</div></div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Role distribution -->
+                        <div class="glass rounded-2xl p-6">
+                            <h3 class="text-sm font-semibold mb-4 flex items-center gap-2"><span class="w-1 h-4 bg-ocean-500 rounded-full"></span>角色分布</h3>
+                            <div class="space-y-3">
+                                <div v-for="(count, role) in (coevoOverview.coevo_stats?.role_distribution||{})" :key="role" class="flex items-center gap-3">
+                                    <span class="text-xs w-16 text-gray-400 shrink-0">{{ {student:'学生',teacher:'导师',researcher:'研究员',pm:'PM'}[role]||role }}</span>
+                                    <div class="flex-1 bg-dark-border rounded-full h-2">
+                                        <div class="h-2 rounded-full" :class="{'bg-ocean-500':role==='student','bg-claw-500':role==='teacher','bg-purple-500':role==='researcher','bg-amber-500':role==='pm'}" :style="{width:Math.min(100,count*5)+'%'}"></div>
+                                    </div>
+                                    <span class="text-sm font-bold text-white w-8 text-right">{{ count }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Projects quick list -->
+                        <div class="lg:col-span-2 glass rounded-2xl p-6">
+                            <h3 class="text-sm font-semibold mb-4 flex items-center gap-2"><span class="w-1 h-4 bg-purple-500 rounded-full"></span>项目一览<button @click="coevoActiveView='projects'" class="ml-auto text-xs text-ocean-400 hover:underline">查看全部 →</button></h3>
+                            <div class="space-y-2">
+                                <div v-for="proj in coevoProjects.slice(0,5)" :key="proj.id" @click="coevoActiveView='projects'; selectCoevoProject(proj)"
+                                     class="flex items-center gap-3 p-3 rounded-xl hover:bg-dark-hover cursor-pointer transition-all">
+                                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-ocean-600 to-purple-700 flex items-center justify-center text-sm font-bold shrink-0">{{ (proj.project_name||'?')[0] }}</div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-medium text-gray-200 truncate">{{ proj.project_name }}</div>
+                                        <div class="text-xs text-gray-500">{{ proj.member_count }} 成员 · {{ proj.meeting_count||0 }} 会议</div>
+                                    </div>
+                                    <div class="flex flex-wrap gap-1 shrink-0">
+                                        <span v-for="(cnt, role) in proj.role_distribution" :key="role" class="text-[10px] px-1.5 py-0.5 rounded-full bg-dark-border text-gray-500">{{ {student:'学生',teacher:'导师',researcher:'研究员',pm:'PM'}[role]||role }}:{{ cnt }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sync log -->
+                    <div class="glass rounded-2xl p-6 mt-6" v-if="coevoSyncLogs.length">
+                        <h3 class="text-sm font-semibold mb-4 flex items-center gap-2"><span class="w-1 h-4 bg-amber-500 rounded-full"></span>同步记录</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs">
+                                <thead><tr class="text-gray-500 border-b border-dark-border"><th class="text-left pb-2 pr-4">类型</th><th class="text-left pb-2 pr-4">触发</th><th class="text-right pb-2 pr-4">读取</th><th class="text-right pb-2 pr-4">新建</th><th class="text-right pb-2 pr-4">更新</th><th class="text-left pb-2 pr-4">状态</th><th class="text-left pb-2">时间</th></tr></thead>
+                                <tbody>
+                                    <tr v-for="log in coevoSyncLogs" :key="log.id" class="border-b border-dark-border/50 hover:bg-dark-hover">
+                                        <td class="py-2 pr-4 font-mono text-gray-300">{{ log.sync_type }}</td>
+                                        <td class="py-2 pr-4 text-gray-500">{{ log.triggered_by }}</td>
+                                        <td class="py-2 pr-4 text-right text-gray-300">{{ log.coevo_records_read }}</td>
+                                        <td class="py-2 pr-4 text-right text-emerald-400">{{ log.openclaw_records_created }}</td>
+                                        <td class="py-2 pr-4 text-right text-ocean-400">{{ log.openclaw_records_updated }}</td>
+                                        <td class="py-2 pr-4"><span class="px-2 py-0.5 rounded-full text-[10px]" :class="log.status==='completed'?'bg-emerald-500/20 text-emerald-400':log.status==='failed'?'bg-red-500/20 text-red-400':'bg-amber-500/20 text-amber-400'">{{ log.status }}</span></td>
+                                        <td class="py-2 text-gray-600 font-mono">{{ (log.completed_at||log.started_at)?.slice(0,16) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Projects ── -->
+                <div v-if="coevoActiveView === 'projects'">
+                    <div v-if="!coevoSelectedProject" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                        <div v-for="proj in coevoProjects" :key="proj.id" @click="selectCoevoProject(proj)"
+                             class="glass rounded-2xl p-5 glass-hover cursor-pointer transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-ocean-600 to-purple-700 flex items-center justify-center text-xl font-bold">{{ (proj.project_name||'?')[0] }}</div>
+                                <div class="flex-1 min-w-0">
+                                    <h4 class="font-semibold text-white group-hover:text-ocean-400 transition-colors truncate">{{ proj.project_name }}</h4>
+                                    <p class="text-xs text-gray-500 font-mono">{{ proj.project_code||'id:'+proj.id }}</p>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-400 line-clamp-2 mb-3">{{ proj.description||'暂无描述' }}</p>
+                            <div class="flex gap-4 text-xs text-gray-400"><span>👥 {{ proj.member_count||0 }} 人</span><span>📋 {{ proj.meeting_count||0 }} 会议</span></div>
+                            <div v-if="proj.role_distribution" class="mt-3 flex flex-wrap gap-1">
+                                <span v-for="(cnt, role) in proj.role_distribution" :key="role" class="text-[10px] px-2 py-0.5 rounded-full bg-dark-border text-gray-500">{{ {student:'学生',teacher:'导师',researcher:'研究员',pm:'PM'}[role]||role }}: {{ cnt }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Project detail -->
+                    <div v-else>
+                        <button @click="coevoSelectedProject=null" class="flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-4">← 返回项目列表</button>
+                        <div v-if="coevoLoading" class="text-center py-8 text-gray-500">加载中...</div>
+                        <div v-else class="space-y-5">
+                            <div class="glass rounded-2xl p-6">
+                                <h3 class="text-xl font-bold text-white">{{ coevoSelectedProject.project?.project_name||coevoSelectedProject.project_name }}</h3>
+                                <p class="text-sm text-gray-400 mt-1">{{ coevoSelectedProject.project?.description||coevoSelectedProject.description||'暂无描述' }}</p>
+                            </div>
+                            <div class="glass rounded-2xl p-6" v-if="coevoSelectedProject.members?.length">
+                                <h4 class="text-sm font-semibold text-gray-400 mb-3">成员 ({{ coevoSelectedProject.members.length }})</h4>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    <div v-for="m in coevoSelectedProject.members" :key="m.id" class="p-3 rounded-xl bg-dark-hover cursor-pointer hover:bg-dark-border transition-all" @click="coevoActiveView='students'; selectCoevoStudent(m)">
+                                        <div class="text-sm font-medium text-gray-200">{{ m.display_name||m.username }}</div>
+                                        <div class="text-xs text-gray-500 mt-0.5">{{ {student:'学生',teacher:'导师',researcher:'研究员',pm:'PM'}[m.project_role]||m.project_role }}</div>
+                                        <div class="text-[10px] text-gray-600 mt-1 line-clamp-2">{{ m.quarterly_goal||'暂无季度目标' }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="glass rounded-2xl p-6" v-if="coevoSelectedProject.recent_meetings?.length">
+                                <h4 class="text-sm font-semibold text-gray-400 mb-3">近期会议</h4>
+                                <div class="space-y-2">
+                                    <div v-for="m in coevoSelectedProject.recent_meetings" :key="m.id" @click="coevoActiveView='meetings'; selectCoevoMeeting(m)" class="flex items-center gap-3 p-3 rounded-xl hover:bg-dark-hover cursor-pointer">
+                                        <span class="text-xl shrink-0">📋</span>
+                                        <div class="flex-1 min-w-0"><div class="text-sm text-gray-200 truncate">{{ m.meeting_name }}</div><div class="text-xs text-gray-500 font-mono">{{ m.meeting_time?.slice(0,16) }}</div></div>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full shrink-0" :class="m.status==='completed'?'bg-emerald-500/20 text-emerald-400':'bg-amber-500/20 text-amber-400'">{{ m.status }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="glass rounded-2xl p-6" v-if="coevoSelectedProject.collaboration_recommendations?.length">
+                                <h4 class="text-sm font-semibold text-gray-400 mb-3">协作推荐 (CoEvo AI)</h4>
+                                <div class="space-y-3">
+                                    <div v-for="c in coevoSelectedProject.collaboration_recommendations" :key="c.id" class="p-4 rounded-xl bg-dark-hover">
+                                        <div class="text-xs text-purple-400 mb-1">{{ c.mode==='auto_best'?'🤖 自动匹配':'👥 手动选择' }}</div>
+                                        <p class="text-sm text-gray-300">{{ c.collaboration_direction }}</p>
+                                        <p class="text-xs text-gray-500 mt-1">{{ c.collaboration_suggestion?.slice(0,120) }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Students ── -->
+                <div v-if="coevoActiveView === 'students'">
+                    <div v-if="!coevoSelectedStudent">
+                        <div class="mb-4 flex items-center gap-3">
+                            <span class="text-sm text-gray-500">共 {{ coevoStudents.length }} 名学生</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-claw-500/10 text-claw-400">已同步: {{ coevoStudents.filter(s=>s.openclaw_student_id).length }}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-gray-500/10 text-gray-500">未同步: {{ coevoStudents.filter(s=>!s.openclaw_student_id).length }}</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                            <div v-for="s in coevoStudents" :key="s.id" @click="selectCoevoStudent(s)"
+                                 class="glass rounded-2xl p-4 glass-hover cursor-pointer transition-all group">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shrink-0"
+                                         :class="s.openclaw_student_id?'bg-gradient-to-br from-claw-500 to-claw-700':'bg-gradient-to-br from-gray-600 to-gray-800'">
+                                        {{ (s.username||s.email||'?')[0].toUpperCase() }}
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-medium text-gray-200 group-hover:text-claw-400 transition-colors truncate">{{ s.username||s.email }}</div>
+                                        <div class="text-xs text-gray-500 truncate">{{ s.email }}</div>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-gray-600 line-clamp-2 mb-2">{{ s.bio||'暂无简介' }}</p>
+                                <div class="flex items-center gap-2">
+                                    <span v-if="s.openclaw_student_id" class="text-[10px] px-2 py-0.5 rounded-full bg-claw-500/10 text-claw-400">✓ 已建档</span>
+                                    <span v-else class="text-[10px] px-2 py-0.5 rounded-full bg-gray-500/10 text-gray-500">未同步</span>
+                                    <span class="text-[10px] text-gray-600 ml-auto">{{ s.last_synced_at?.slice(0,10)||'' }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Student detail -->
+                    <div v-else>
+                        <button @click="coevoSelectedStudent=null" class="flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-4">← 返回学生列表</button>
+                        <div v-if="coevoLoading" class="text-center py-8 text-gray-500">加载中...</div>
+                        <div v-else class="space-y-5">
+                            <div class="glass rounded-2xl p-6">
+                                <div class="flex items-start gap-4">
+                                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-ocean-500 to-purple-700 flex items-center justify-center text-2xl font-bold shrink-0">{{ ((coevoSelectedStudent.user||coevoSelectedStudent).username||'?')[0].toUpperCase() }}</div>
+                                    <div class="flex-1">
+                                        <h3 class="text-xl font-bold text-white">{{ (coevoSelectedStudent.user||coevoSelectedStudent).username }}</h3>
+                                        <p class="text-sm text-gray-400">{{ (coevoSelectedStudent.user||coevoSelectedStudent).email }}</p>
+                                        <p class="text-sm text-gray-500 mt-2">{{ (coevoSelectedStudent.user||coevoSelectedStudent).bio||'暂无简介' }}</p>
+                                    </div>
+                                    <div v-if="coevoSelectedStudent.openclaw_enrichment?.openclaw_student_id" class="text-xs px-3 py-1 rounded-full bg-claw-500/20 text-claw-400 border border-claw-500/30 shrink-0">
+                                        ✓ OpenClaw #{{ coevoSelectedStudent.openclaw_enrichment.openclaw_student_id }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                                <div class="glass rounded-2xl p-5" v-if="coevoSelectedStudent.projects?.length">
+                                    <h4 class="text-sm font-semibold text-gray-400 mb-3">所在项目</h4>
+                                    <div class="space-y-2">
+                                        <div v-for="p in coevoSelectedStudent.projects" :key="p.project_id" class="p-3 rounded-xl bg-dark-hover">
+                                            <div class="text-sm text-gray-200">{{ p.project_name }}</div>
+                                            <div class="text-xs text-gray-500 mt-0.5">{{ {student:'学生',teacher:'导师'}[p.project_role]||p.project_role }}</div>
+                                            <div v-if="p.quarterly_goal" class="text-xs text-gray-600 mt-1 line-clamp-2">📅 {{ p.quarterly_goal }}</div>
+                                            <div v-if="p.short_term_goal" class="text-xs text-gray-600 mt-0.5 line-clamp-1">→ {{ p.short_term_goal }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="glass rounded-2xl p-5" v-if="coevoSelectedStudent.openclaw_enrichment?.capability_scores?.length">
+                                    <h4 class="text-sm font-semibold text-gray-400 mb-3">能力评估 (OpenClaw)</h4>
+                                    <div class="space-y-2">
+                                        <div v-for="sc in coevoSelectedStudent.openclaw_enrichment.capability_scores" :key="sc.dimension" class="flex items-center gap-3">
+                                            <span class="text-xs text-gray-400 w-16 shrink-0">{{ sc.label }}</span>
+                                            <div class="flex-1 bg-dark-border rounded-full h-1.5"><div class="h-1.5 rounded-full bg-gradient-to-r from-claw-500 to-ocean-500" :style="{width:(sc.score/10*100)+'%'}"></div></div>
+                                            <span class="text-xs font-bold text-white w-5 text-right">{{ sc.score }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="glass rounded-2xl p-5" v-if="coevoSelectedStudent.pre_reports?.length">
+                                <h4 class="text-sm font-semibold text-gray-400 mb-3">近期会前报告</h4>
+                                <div class="space-y-3">
+                                    <div v-for="r in coevoSelectedStudent.pre_reports.slice(0,3)" :key="r.id" class="p-4 rounded-xl bg-dark-hover border-l-2 border-ocean-500/30">
+                                        <div class="text-xs text-ocean-400 font-mono mb-2">{{ r.meeting_name }} · {{ r.meeting_time?.slice(0,10) }}</div>
+                                        <div v-if="r.task_items" class="text-xs text-gray-300 mb-1"><span class="text-gray-500">进行中: </span>{{ r.task_items }}</div>
+                                        <div v-if="r.key_blockers" class="mt-1 p-2 rounded bg-red-500/10 border border-red-500/20"><span class="text-[10px] text-red-400">⚠ 阻塞: </span><span class="text-xs text-red-300">{{ r.key_blockers }}</span></div>
+                                        <div v-if="r.next_week_plan" class="text-xs text-gray-500 mt-1"><span class="text-gray-600">下周: </span>{{ r.next_week_plan }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="glass rounded-2xl p-5" v-if="coevoSelectedStudent.post_reports?.length">
+                                <h4 class="text-sm font-semibold text-gray-400 mb-3">近期会后 AI 报告</h4>
+                                <div class="space-y-3">
+                                    <div v-for="r in coevoSelectedStudent.post_reports.slice(0,3)" :key="r.id" class="p-4 rounded-xl bg-dark-hover border-l-2 border-purple-500/30">
+                                        <div class="text-xs text-purple-400 font-mono mb-2">{{ r.meeting_name }} · {{ r.meeting_time?.slice(0,10) }}</div>
+                                        <div v-if="r.teacher_comments" class="mb-2 p-2 rounded bg-amber-500/10"><span class="text-[10px] text-amber-400">导师评价: </span><span class="text-xs text-amber-200">{{ r.teacher_comments }}</span></div>
+                                        <div v-if="r.teacher_suggestions"><span class="text-[10px] text-gray-500">建议: </span><span class="text-xs text-gray-300">{{ r.teacher_suggestions }}</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Meetings ── -->
+                <div v-if="coevoActiveView === 'meetings'">
+                    <div v-if="!coevoSelectedMeeting" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        <div v-for="m in coevoMeetings" :key="m.id" @click="selectCoevoMeeting(m)"
+                             class="glass rounded-2xl p-4 glass-hover cursor-pointer transition-all group">
+                            <div class="flex items-start gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center text-lg" :class="m.status==='completed'?'bg-emerald-500/20':'bg-amber-500/20'">📋</div>
+                                <div class="flex-1 min-w-0">
+                                    <h4 class="text-sm font-medium text-gray-200 group-hover:text-ocean-400 line-clamp-2 transition-colors">{{ m.meeting_name }}</h4>
+                                    <div class="text-xs text-gray-500 font-mono mt-0.5">{{ m.meeting_time?.slice(0,16) }}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] px-2 py-0.5 rounded-full" :class="m.status==='completed'?'bg-emerald-500/20 text-emerald-400':m.status==='in_progress'?'bg-amber-500/20 text-amber-400':'bg-gray-500/20 text-gray-400'">{{ {completed:'已完成',in_progress:'进行中',notified:'已通知',draft:'草稿'}[m.status]||m.status }}</span>
+                                <span v-if="m.openclaw_insight_count" class="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">✨ {{ m.openclaw_insight_count }} 洞察</span>
+                            </div>
+                            <p v-if="m.overall_summary" class="mt-2 text-xs text-gray-500 line-clamp-2">{{ m.overall_summary }}</p>
+                        </div>
+                    </div>
+                    <div v-else>
+                        <button @click="coevoSelectedMeeting=null" class="flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-4">← 返回会议列表</button>
+                        <div v-if="coevoLoading" class="text-center py-8 text-gray-500">加载中...</div>
+                        <div v-else class="space-y-5">
+                            <div class="glass rounded-2xl p-6">
+                                <h3 class="text-xl font-bold text-white">{{ coevoSelectedMeeting.meeting?.meeting_name||coevoSelectedMeeting.meeting_name }}</h3>
+                                <p class="text-sm text-gray-400 font-mono mt-1">{{ (coevoSelectedMeeting.meeting?.meeting_time||coevoSelectedMeeting.meeting_time)?.slice(0,16) }}</p>
+                                <div v-if="coevoSelectedMeeting.meeting?.overall_summary" class="mt-3 p-4 rounded-xl bg-dark-hover">
+                                    <div class="text-xs text-purple-400 mb-1">🤖 CoEvo AI 会议总结</div>
+                                    <p class="text-sm text-gray-300 leading-relaxed">{{ coevoSelectedMeeting.meeting.overall_summary }}</p>
+                                </div>
+                            </div>
+                            <div class="glass rounded-2xl p-6" v-if="coevoSelectedMeeting.student_reports?.length">
+                                <h4 class="text-sm font-semibold text-gray-400 mb-4">学生报告 ({{ coevoSelectedMeeting.student_reports.length }} 人)</h4>
+                                <div class="space-y-4">
+                                    <div v-for="sr in coevoSelectedMeeting.student_reports" :key="sr.user_id" class="p-4 rounded-xl bg-dark-hover">
+                                        <div class="flex items-center gap-2 mb-3">
+                                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-ocean-600 to-purple-700 flex items-center justify-center text-sm font-bold">{{ (sr.student_name||'?')[0] }}</div>
+                                            <span class="text-sm font-medium text-gray-200">{{ sr.student_name }}</span>
+                                        </div>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div v-if="sr.pre" class="p-3 rounded-lg bg-ocean-500/5 border border-ocean-500/10">
+                                                <div class="text-[10px] text-ocean-400 mb-1">会前报告</div>
+                                                <div v-if="sr.pre.key_blockers" class="text-xs text-red-300 mb-1">⚠ {{ sr.pre.key_blockers?.slice(0,80) }}</div>
+                                                <div v-if="sr.pre.next_week_plan" class="text-xs text-gray-400">→ {{ sr.pre.next_week_plan?.slice(0,80) }}</div>
+                                            </div>
+                                            <div v-if="sr.post" class="p-3 rounded-lg bg-purple-500/5 border border-purple-500/10">
+                                                <div class="text-[10px] text-purple-400 mb-1">会后 AI 报告</div>
+                                                <div v-if="sr.post.teacher_comments" class="text-xs text-amber-300 mb-1">{{ sr.post.teacher_comments?.slice(0,80) }}</div>
+                                                <div v-if="sr.post.core_viewpoints" class="text-xs text-gray-400">{{ sr.post.core_viewpoints?.slice(0,80) }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Analytics ── -->
+                <div v-if="coevoActiveView === 'analytics'" class="space-y-6">
+                    <div class="flex gap-3">
+                        <button @click="loadCoevoBlockers(); loadCoevoEngagement(); loadCoevoMomentum()" class="px-4 py-2 bg-claw-500/20 hover:bg-claw-500/30 text-claw-400 rounded-xl text-xs transition-all">刷新分析数据</button>
+                    </div>
+                    <!-- Blockers -->
+                    <div class="glass rounded-2xl p-6" v-if="coevoBlockers.length">
+                        <h3 class="text-sm font-semibold mb-4 flex items-center gap-2"><span class="w-1 h-4 bg-red-500 rounded-full"></span>团队阻塞问题汇总 <span class="text-xs text-gray-500 font-normal">— 来自最近会前报告</span></h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            <div v-for="sb in coevoBlockers" :key="sb.user_id" class="p-4 rounded-xl bg-dark-hover">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-red-700 to-orange-700 flex items-center justify-center text-sm font-bold">{{ (sb.student_name||'?')[0] }}</div>
+                                    <span class="text-sm font-medium text-gray-200">{{ sb.student_name }}</span>
+                                </div>
+                                <div v-for="(b,i) in sb.recent_blockers" :key="i" class="mb-2">
+                                    <div class="text-[10px] text-gray-600 mb-0.5 font-mono">{{ b.meeting_time?.slice(0,10) }}</div>
+                                    <p class="text-xs text-red-300 p-2 rounded bg-red-500/10">{{ b.blockers }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Engagement -->
+                    <div class="glass rounded-2xl p-6">
+                        <h3 class="text-sm font-semibold mb-4 flex items-center gap-2"><span class="w-1 h-4 bg-ocean-500 rounded-full"></span>会议参与度 <span class="text-xs text-gray-500 font-normal">— 会前报告提交率</span></h3>
+                        <div v-if="!coevoEngagement.length" class="text-center py-6">
+                            <button @click="loadCoevoEngagement().then(()=>$nextTick(()=>renderEngagementChart(coevoEngagement)))" class="px-4 py-2 bg-ocean-500/20 text-ocean-400 rounded-xl text-sm hover:bg-ocean-500/30 transition-all">加载参与度数据</button>
+                        </div>
+                        <div v-else>
+                            <div id="engagement-chart" style="height: 300px;"></div>
+                            <div class="mt-4 grid grid-cols-3 gap-3 text-center">
+                                <div class="p-3 rounded-xl bg-emerald-500/10"><div class="text-lg font-bold text-emerald-400">{{ coevoEngagement.filter(e=>e.engagement_rate>=0.8).length }}</div><div class="text-xs text-gray-500">高参与 ≥80%</div></div>
+                                <div class="p-3 rounded-xl bg-amber-500/10"><div class="text-lg font-bold text-amber-400">{{ coevoEngagement.filter(e=>e.engagement_rate>=0.5&&e.engagement_rate<0.8).length }}</div><div class="text-xs text-gray-500">中等 50-80%</div></div>
+                                <div class="p-3 rounded-xl bg-red-500/10"><div class="text-lg font-bold text-red-400">{{ coevoEngagement.filter(e=>e.engagement_rate<0.5).length }}</div><div class="text-xs text-gray-500">需关注 &lt;50%</div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Research Momentum -->
+                    <div class="glass rounded-2xl p-6">
+                        <h3 class="text-sm font-semibold mb-4 flex items-center gap-2"><span class="w-1 h-4 bg-purple-500 rounded-full"></span>研究动能分析 <span class="text-xs text-gray-500 font-normal">— 协作完成度 × OpenClaw 评估覆盖率</span></h3>
+                        <div v-if="!coevoMomentum.length" class="text-center py-6">
+                            <button @click="loadCoevoMomentum()" class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-xl text-sm hover:bg-purple-500/30 transition-all">加载动能数据</button>
+                        </div>
+                        <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            <div v-for="p in coevoMomentum" :key="p.project_id" class="p-4 rounded-xl bg-dark-hover">
+                                <div class="text-sm font-medium text-gray-200 mb-3 truncate">{{ p.project_name }}</div>
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex justify-between"><span class="text-gray-500">已完成协作</span><span class="text-purple-400 font-bold">{{ p.completed_collaborations }}</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-500">研究规划</span><span class="text-ocean-400 font-bold">{{ p.research_plans }}</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-500">OpenClaw 覆盖</span><span class="font-bold" :class="p.assessment_coverage>=0.5?'text-emerald-400':'text-amber-400'">{{ (p.assessment_coverage*100).toFixed(0) }}%</span></div>
+                                    <div class="w-full bg-dark-border rounded-full h-1.5 mt-1"><div class="h-1.5 rounded-full bg-gradient-to-r from-purple-500 to-ocean-500" :style="{width:(p.assessment_coverage*100)+'%'}"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- END CoEvo sub-view -->
+                </div>
+
+            </div>
+            <!-- ====== END DATA HUB ====== -->
+
+            <!-- ====== SCHEDULER MANAGEMENT ====== -->
+            <div v-if="currentTab === 'scheduler'" class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold gradient-text">调度管理</h2>
+                        <p class="text-xs text-gray-500 mt-1">管理自动任务频率 · Scheduler 运行于 :10302</p>
+                    </div>
+                    <button @click="loadSchedulerJobs()" class="flex items-center gap-2 px-4 py-2 bg-dark-card hover:bg-dark-hover border border-dark-border rounded-xl text-sm text-gray-300 transition-all">
+                        <span :class="schedulerLoading?'animate-spin':''">🔄</span> 刷新
+                    </button>
+                </div>
+
+                <!-- Loading -->
+                <div v-if="schedulerLoading && !schedulerJobs.length" class="flex items-center justify-center py-20 text-gray-500">
+                    <svg class="animate-spin w-6 h-6 mr-3" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                    </svg>
+                    加载中...
+                </div>
+
+                <!-- Jobs Grid -->
+                <div v-else class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <div v-for="job in schedulerJobs.filter(j=>!j.internal)" :key="job.id"
+                         class="glass rounded-2xl p-5 flex flex-col gap-3">
+                        <!-- Header -->
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-xs font-mono px-2 py-0.5 rounded-full"
+                                          :class="job.paused ? 'bg-gray-500/20 text-gray-400' : 'bg-emerald-500/20 text-emerald-400'">
+                                        {{ job.paused ? '⏸ 已暂停' : '▶ 运行中' }}
+                                    </span>
+                                    <span v-if="job.skill && job.skill.startsWith('__')" class="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400">内置</span>
+                                    <span v-else-if="job.skill" class="text-[10px] px-2 py-0.5 rounded-full bg-ocean-500/10 text-ocean-400">{{ job.skill }}</span>
+                                </div>
+                                <h4 class="text-sm font-semibold text-gray-200">{{ job.id }}</h4>
+                                <p class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ job.description || '无描述' }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Cron + Next Run -->
+                        <div class="flex items-center gap-3">
+                            <div class="flex-1 bg-dark-input rounded-xl px-3 py-2">
+                                <div class="text-[10px] text-gray-600 mb-0.5">Cron 表达式</div>
+                                <code class="text-xs text-claw-400 font-mono">{{ job.cron }}</code>
+                            </div>
+                        </div>
+                        <div v-if="job.next_run_time" class="text-xs text-gray-500">
+                            <span class="text-gray-600">下次运行：</span>
+                            <span class="text-gray-400 font-mono">{{ job.next_run_time?.slice(0,19)?.replace('T',' ') }}</span>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex items-center gap-2 mt-auto pt-2 border-t border-dark-border">
+                            <button @click="openSchedulerEdit(job)"
+                                    class="flex-1 px-3 py-1.5 bg-claw-500/10 hover:bg-claw-500/20 text-claw-400 rounded-lg text-xs transition-all text-center">
+                                ✏️ 修改频率
+                            </button>
+                            <button @click="triggerSchedulerJob(job.id)"
+                                    class="flex-1 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs transition-all text-center">
+                                ▶ 立即执行
+                            </button>
+                            <button v-if="!job.paused" @click="pauseSchedulerJob(job.id)"
+                                    class="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg text-xs transition-all">
+                                ⏸
+                            </button>
+                            <button v-else @click="resumeSchedulerJob(job.id)"
+                                    class="px-3 py-1.5 bg-ocean-500/10 hover:bg-ocean-500/20 text-ocean-400 rounded-lg text-xs transition-all">
+                                ▶
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Modal -->
+                <transition name="fade">
+                <div v-if="schedulerEditJob" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" @click.self="closeSchedulerEdit()">
+                    <div class="glass rounded-2xl p-6 w-full max-w-md mx-4 border border-dark-border shadow-2xl">
+                        <div class="flex items-center justify-between mb-5">
+                            <div>
+                                <h3 class="text-lg font-bold text-white">修改调度频率</h3>
+                                <p class="text-xs text-gray-500 mt-0.5 font-mono">{{ schedulerEditJob.id }}</p>
+                            </div>
+                            <button @click="closeSchedulerEdit()" class="text-gray-500 hover:text-white text-xl leading-none">✕</button>
+                        </div>
+
+                        <!-- Preset buttons -->
+                        <div class="mb-4">
+                            <label class="text-xs text-gray-400 mb-2 block">快捷预设</label>
+                            <div class="flex flex-wrap gap-2">
+                                <button v-for="p in CRON_PRESETS" :key="p.value"
+                                        @click="schedulerEditCron = p.value"
+                                        :class="[
+                                            'px-3 py-1.5 rounded-lg text-xs transition-all border',
+                                            schedulerEditCron === p.value
+                                                ? 'bg-claw-500/30 text-claw-300 border-claw-500/50'
+                                                : 'bg-dark-hover text-gray-400 border-dark-border hover:border-gray-600'
+                                        ]">
+                                    {{ p.label }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Cron input -->
+                        <div class="mb-4">
+                            <label class="text-xs text-gray-400 mb-1 block">Cron 表达式 <span class="text-gray-600">（分 时 日 月 周）</span></label>
+                            <input v-model="schedulerEditCron"
+                                   class="w-full bg-dark-input border border-dark-border rounded-xl px-4 py-2.5 text-sm text-claw-400 font-mono focus:outline-none focus:border-claw-500/50"
+                                   placeholder="0 6 * * *" />
+                            <p class="text-[10px] text-gray-600 mt-1">示例：<span class="font-mono text-gray-500">0 6 * * *</span> 每天06:00 · <span class="font-mono text-gray-500">0 3 * * 1</span> 每周一03:00</p>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="mb-6">
+                            <label class="text-xs text-gray-400 mb-1 block">描述（可选）</label>
+                            <input v-model="schedulerEditDesc"
+                                   class="w-full bg-dark-input border border-dark-border rounded-xl px-4 py-2.5 text-sm text-gray-300 focus:outline-none focus:border-claw-500/50"
+                                   :placeholder="schedulerEditJob.description || '任务描述'" />
+                        </div>
+
+                        <div class="flex gap-3">
+                            <button @click="closeSchedulerEdit()" class="flex-1 px-4 py-2.5 bg-dark-hover rounded-xl text-sm text-gray-400 hover:text-gray-200 transition-all">取消</button>
+                            <button @click="saveSchedulerJob()"
+                                    :disabled="schedulerSaving || !schedulerEditCron"
+                                    class="flex-1 px-4 py-2.5 bg-claw-500 hover:bg-claw-600 disabled:opacity-50 rounded-xl text-sm text-white font-medium transition-all">
+                                {{ schedulerSaving ? '保存中...' : '保存更新' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                </transition>
+            </div>
+            <!-- ====== END SCHEDULER MANAGEMENT ====== -->
+
+            <!-- ====== KNOWLEDGE GRAPH ====== -->
+            <div v-if="currentTab === 'knowledge'" class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold gradient-text">知识图谱</h2>
+                        <p class="text-xs text-gray-500 mt-1">团队与个人知识库 · 语义检索 · 分层记忆架构</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button @click="knowledgeTab='search'" :class="knowledgeTab==='search'?'bg-claw-500 text-white':'bg-dark-card text-gray-300 border border-dark-border'" class="px-4 py-2 rounded-xl text-sm transition-all">🔍 检索</button>
+                        <button @click="knowledgeTab='entity'" :class="knowledgeTab==='entity'?'bg-claw-500 text-white':'bg-dark-card text-gray-300 border border-dark-border'" class="px-4 py-2 rounded-xl text-sm transition-all">👤 画像</button>
+                        <button @click="knowledgeTab='add'" :class="knowledgeTab==='add'?'bg-claw-500 text-white':'bg-dark-card text-gray-300 border border-dark-border'" class="px-4 py-2 rounded-xl text-sm transition-all">➕ 写入</button>
+                        <button @click="knowledgeTab='stats'" :class="knowledgeTab==='stats'?'bg-claw-500 text-white':'bg-dark-card text-gray-300 border border-dark-border'" class="px-4 py-2 rounded-xl text-sm transition-all">📊 统计</button>
+                    </div>
+                </div>
+
+                <!-- 架构说明卡片 -->
+                <div class="glass border border-dark-border rounded-2xl p-4 mb-6 text-xs text-gray-400 grid grid-cols-5 gap-3">
+                    <div class="text-center">
+                        <div class="text-lg mb-1">⚡</div>
+                        <div class="font-semibold text-gray-300">L0 工作记忆</div>
+                        <div>Redis TTL<br>任务内共享</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-lg mb-1">📋</div>
+                        <div class="font-semibold text-gray-300">L1 情节记忆</div>
+                        <div>对话 + 任务日志<br>时序历史</div>
+                    </div>
+                    <div class="text-center border-x border-claw-500/30">
+                        <div class="text-lg mb-1">🧠</div>
+                        <div class="font-semibold text-claw-400">L2 语义记忆</div>
+                        <div>knowledge_nodes<br>向量嵌入检索</div>
+                    </div>
+                    <div class="text-center border-r border-claw-500/30">
+                        <div class="text-lg mb-1">🔗</div>
+                        <div class="font-semibold text-claw-400">L3 结构记忆</div>
+                        <div>knowledge_edges<br>知识图谱关系</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-lg mb-1">📚</div>
+                        <div class="font-semibold text-gray-300">L4 档案记忆</div>
+                        <div>memory_summaries<br>周期压缩蒸馏</div>
+                    </div>
+                </div>
+
+                <!-- 检索面板 -->
+                <div v-if="knowledgeTab === 'search'">
+                    <div class="flex gap-3 mb-5">
+                        <input v-model="knowledgeSearchQ"
+                               @keyup.enter="searchKnowledge()"
+                               placeholder="语义检索：输入问题或关键词，如「张三研究方向」「项目A进展」"
+                               class="flex-1 px-4 py-3 bg-dark-card border border-dark-border rounded-xl text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-claw-500" />
+                        <button @click="searchKnowledge()" :disabled="knowledgeLoading"
+                                class="px-6 py-3 bg-claw-500 hover:bg-claw-600 disabled:opacity-50 rounded-xl text-sm text-white font-medium transition-all">
+                            {{ knowledgeLoading ? '检索中...' : '🔍 检索' }}
+                        </button>
+                    </div>
+
+                    <!-- 结果列表 -->
+                    <div v-if="knowledgeResults.length" class="space-y-3">
+                        <div v-for="node in knowledgeResults" :key="node.id"
+                             class="glass border border-dark-border hover:border-claw-500/40 rounded-xl p-4 transition-all">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="px-2 py-0.5 rounded-md text-xs font-medium"
+                                              :class="{
+                                                'bg-blue-500/20 text-blue-400': node.entity_type==='person',
+                                                'bg-purple-500/20 text-purple-400': node.entity_type==='project',
+                                                'bg-green-500/20 text-green-400': node.entity_type==='research',
+                                                'bg-amber-500/20 text-amber-400': node.entity_type==='concept',
+                                                'bg-claw-500/20 text-claw-400': node.entity_type==='insight',
+                                                'bg-gray-500/20 text-gray-400': node.entity_type==='event',
+                                              }">{{ node.entity_type }}</span>
+                                        <span class="font-semibold text-gray-200 text-sm">{{ node.entity_id }} · {{ node.title }}</span>
+                                    </div>
+                                    <p class="text-xs text-gray-400 leading-relaxed line-clamp-3">{{ node.content }}</p>
+                                </div>
+                                <div class="text-right text-xs text-gray-500 shrink-0">
+                                    <div>重要性 <span class="text-claw-400 font-medium">{{ node.importance }}</span></div>
+                                    <div v-if="node._score">相关度 {{ (node._score * 100).toFixed(0) }}%</div>
+                                    <div>{{ node.source }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else-if="!knowledgeLoading" class="text-center py-16 text-gray-500">
+                        <div class="text-4xl mb-3">🧠</div>
+                        <p>输入查询以语义检索知识库</p>
+                        <p class="text-xs mt-2">知识由 Librarian 自动从对话中提取，每天 01:00 更新</p>
+                    </div>
+                </div>
+
+                <!-- 实体画像面板 -->
+                <div v-if="knowledgeTab === 'entity'">
+                    <div class="flex gap-3 mb-5">
+                        <input v-model="knowledgeEntityId"
+                               @keyup.enter="loadEntityProfile()"
+                               placeholder="实体名称，如「张三」、「项目A」"
+                               class="flex-1 px-4 py-3 bg-dark-card border border-dark-border rounded-xl text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-claw-500" />
+                        <button @click="loadEntityProfile()" :disabled="knowledgeLoading"
+                                class="px-5 py-3 bg-dark-card hover:bg-dark-hover border border-dark-border rounded-xl text-sm text-gray-300 transition-all">
+                            👤 画像
+                        </button>
+                        <button @click="loadEntityGraph()" :disabled="knowledgeLoading"
+                                class="px-5 py-3 bg-dark-card hover:bg-dark-hover border border-dark-border rounded-xl text-sm text-gray-300 transition-all">
+                            🔗 关系图
+                        </button>
+                    </div>
+
+                    <!-- 知识画像 Markdown 渲染 -->
+                    <div v-if="knowledgeProfile" class="glass border border-dark-border rounded-2xl p-5 mb-4">
+                        <pre class="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed font-mono">{{ knowledgeProfile }}</pre>
+                    </div>
+
+                    <!-- 关系图（文字展示） -->
+                    <div v-if="knowledgeSubGraph.edges && knowledgeSubGraph.edges.length" class="glass border border-claw-500/20 rounded-2xl p-4">
+                        <h3 class="text-sm font-semibold text-claw-400 mb-3">🔗 知识关系图 ({{ knowledgeSubGraph.nodes.length }} 节点 · {{ knowledgeSubGraph.edges.length }} 关系)</h3>
+                        <div class="space-y-1">
+                            <div v-for="edge in knowledgeSubGraph.edges.slice(0,20)" :key="edge.id" class="flex items-center gap-2 text-xs text-gray-400">
+                                <span class="text-blue-400 font-medium">{{ edge.from_entity }}</span>
+                                <span class="text-gray-600">—[{{ edge.relation }}]→</span>
+                                <span class="text-purple-400 font-medium">{{ edge.to_entity }}</span>
+                                <span class="text-gray-600 ml-auto">强度 {{ edge.weight?.toFixed(1) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 手动写入面板 -->
+                <div v-if="knowledgeTab === 'add'">
+                    <div class="glass border border-dark-border rounded-2xl p-6 space-y-4">
+                        <h3 class="text-sm font-semibold text-gray-300">手动写入知识节点</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs text-gray-500 mb-1 block">实体类型</label>
+                                <select v-model="newKnowledgeNode.entity_type"
+                                        class="w-full px-3 py-2 bg-dark-hover border border-dark-border rounded-xl text-sm text-gray-200">
+                                    <option value="person">person — 人物</option>
+                                    <option value="project">project — 项目</option>
+                                    <option value="research">research — 研究方向</option>
+                                    <option value="concept">concept — 概念</option>
+                                    <option value="insight">insight — 洞见</option>
+                                    <option value="event">event — 事件</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500 mb-1 block">实体 ID（人名/项目名）</label>
+                                <input v-model="newKnowledgeNode.entity_id"
+                                       placeholder="如：张三 / 项目A"
+                                       class="w-full px-3 py-2 bg-dark-hover border border-dark-border rounded-xl text-sm text-gray-200 focus:outline-none focus:border-claw-500" />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500 mb-1 block">标题</label>
+                            <input v-model="newKnowledgeNode.title"
+                                   placeholder="简短描述这条知识"
+                                   class="w-full px-3 py-2 bg-dark-hover border border-dark-border rounded-xl text-sm text-gray-200 focus:outline-none focus:border-claw-500" />
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500 mb-1 block">知识内容</label>
+                            <textarea v-model="newKnowledgeNode.content" rows="4"
+                                      placeholder="详细描述这条知识..."
+                                      class="w-full px-3 py-2 bg-dark-hover border border-dark-border rounded-xl text-sm text-gray-200 focus:outline-none focus:border-claw-500 resize-none"></textarea>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="flex-1">
+                                <label class="text-xs text-gray-500 mb-1 block">重要性 (0-100)：{{ newKnowledgeNode.importance }}</label>
+                                <input type="range" min="0" max="100" v-model.number="newKnowledgeNode.importance"
+                                       class="w-full accent-claw-500" />
+                            </div>
+                            <button @click="addKnowledgeNode()" :disabled="knowledgeNodeSaving"
+                                    class="px-6 py-2.5 bg-claw-500 hover:bg-claw-600 disabled:opacity-50 rounded-xl text-sm text-white font-medium transition-all">
+                                {{ knowledgeNodeSaving ? '保存中...' : '💾 写入知识图谱' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 统计面板 -->
+                <div v-if="knowledgeTab === 'stats'">
+                    <div v-if="knowledgeStats" class="space-y-4">
+                        <!-- 向量覆盖率 -->
+                        <div class="glass border border-dark-border rounded-2xl p-5">
+                            <h3 class="text-sm font-semibold text-gray-300 mb-3">向量嵌入覆盖率</h3>
+                            <div class="flex items-center gap-4">
+                                <div class="flex-1 bg-dark-hover rounded-full h-3 overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-claw-500 to-purple-500 rounded-full transition-all"
+                                         :style="`width:${knowledgeStats.embedding_coverage?.coverage_pct||0}%`"></div>
+                                </div>
+                                <span class="text-sm font-medium text-claw-400 w-14 text-right">
+                                    {{ knowledgeStats.embedding_coverage?.coverage_pct || 0 }}%
+                                </span>
+                            </div>
+                            <div class="flex justify-between text-xs text-gray-500 mt-2">
+                                <span>已嵌入 {{ knowledgeStats.embedding_coverage?.embedded || 0 }} 节点</span>
+                                <span>共 {{ knowledgeStats.embedding_coverage?.total || 0 }} 节点</span>
+                            </div>
+                        </div>
+
+                        <!-- 节点类型分布 -->
+                        <div class="glass border border-dark-border rounded-2xl p-5">
+                            <h3 class="text-sm font-semibold text-gray-300 mb-4">知识节点分布</h3>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div v-for="t in knowledgeStats.nodes_by_type" :key="t.entity_type"
+                                     class="bg-dark-hover rounded-xl p-3 text-center">
+                                    <div class="text-xl font-bold text-claw-400">{{ t.cnt }}</div>
+                                    <div class="text-xs text-gray-400 mt-1">{{ t.entity_type }}</div>
+                                    <div class="text-xs text-gray-500">均重要性 {{ parseFloat(t.avg_importance).toFixed(0) }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 图谱概览 -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="glass border border-dark-border rounded-2xl p-5 text-center">
+                                <div class="text-3xl font-bold gradient-text">{{ knowledgeStats.total_edges }}</div>
+                                <div class="text-xs text-gray-500 mt-1">关系边（L3 图谱）</div>
+                            </div>
+                            <div class="glass border border-dark-border rounded-2xl p-5 text-center">
+                                <div class="text-3xl font-bold gradient-text">{{ knowledgeStats.total_summaries }}</div>
+                                <div class="text-xs text-gray-500 mt-1">历史摘要（L4 档案）</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="text-center py-16 text-gray-500">
+                        <div class="text-4xl mb-3 animate-spin">🔄</div>
+                        <p>加载统计中...</p>
+                    </div>
+                </div>
+
+            </div>
+            <!-- ====== END KNOWLEDGE GRAPH ====== -->
+
+        </main>
+    </div>
+    <!-- Particle Background -->
+    <script src="static/js/particles.js"></script>
+    <!-- Vue App -->
+    <script src="static/js/app.js"></script>
+</body>
+</html>

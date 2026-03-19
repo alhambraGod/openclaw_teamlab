@@ -1,0 +1,76 @@
+# ============================================================
+# 混合模式：OpenClaw 在容器，TeamLab 数据后端在宿主机后台运行
+# 使用方式：cd claw && make claw start
+# ============================================================
+#
+# 端口分配（10300-10399 段）：
+#   10300 → OpenClaw Gateway UI（容器对外）
+#   10301 → TeamLab FastAPI（宿主机直接运行）
+#   10302 → Scheduler（宿主机直接运行）
+#   10310-10329 → Worker 池（宿主机直接运行）
+#
+# 通信方式：
+#   claw-openclaw Agent 通过 bash+curl 调用宿主机 TeamLab
+#   HTTP 接口（/api/agent/*），经 host.docker.internal 访问宿主机。
+#
+# ────────────────────────────────────────────────────────────
+# Skill 隔离说明（重要）：
+#   容器内 ~/.openclaw = 宿主机 ./config   (project-specific 配置)
+#   容器内 ~/.openclaw/workspace = 宿主机 ./workspace (project-specific 工作区)
+#
+#   Skills 目录：../workspace/skills/ → 容器内 /home/node/.openclaw/workspace/skills/
+#   本项目专属 Skills，与宿主机全局 ~/.openclaw 完全隔离，互不影响。
+#   不要将 Skills 复制到宿主机 ~/.openclaw/workspace/skills/。
+# ────────────────────────────────────────────────────────────
+
+services:
+
+  # ── C-Si TeamLab 专属 OpenClaw ─────────────────────────────────────────
+  claw-openclaw:
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+    container_name: claw-openclaw
+    ports:
+      - "10300:10300"       # OpenClaw Gateway UI
+    volumes:
+      # 项目专属配置（openclaw.json、agents/、feishu/ 等），隔离于宿主机 ~/.openclaw
+      - ./config:/home/node/.openclaw
+      # Installed Skills：挂载到 skills/ 专用路径，UI 中显示为 INSTALLED SKILLS
+      - ./skills:/home/node/.openclaw/skills
+      # 项目专属工作区（AGENTS.md、IDENTITY.md、TEAMLAB_API.md 等上下文文档）
+      - ./workspace:/home/node/.openclaw/workspace
+      # 运行时数据（sessions 日志等），使用 Docker named volume 持久化
+      - claw-openclaw-data:/home/node/.openclaw/data
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      TZ: Asia/Shanghai
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      TEAMLAB_BASE_URL: http://host.docker.internal:10301
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD", "node", "-e",
+          "fetch('http://127.0.0.1:10300/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "30"
+        tag: "claw-openclaw"
+    networks:
+      - claw-net
+
+networks:
+  claw-net:
+    driver: bridge
+
+volumes:
+  claw-openclaw-data:

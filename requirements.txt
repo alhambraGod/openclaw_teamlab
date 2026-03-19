@@ -1,0 +1,20 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.35.0
+websockets>=15.0.1
+aiomysql>=0.2.0
+sqlalchemy[asyncio]>=2.0.36
+redis[hiredis]>=5.2.1
+apscheduler==3.10.4
+httpx>=0.28.1
+openai>=1.58.0
+pandas>=2.2.3
+jinja2>=3.1.4
+python-dotenv>=1.1.0
+pydantic[email]>=2.11.7
+pydantic-settings>=2.7.0
+python-multipart>=0.0.19
+aiofiles>=24.1.0
+cryptography>=44.0.0
+PyYAML>=6.0.2
+# lark-oapi 和 dingtalk-stream 已移除（飞书/钉钉 IM 入口已迁至 csi-openclaw Docker 容器）
+aiosmtplib>=3.0

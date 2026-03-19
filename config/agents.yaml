@@ -1,0 +1,143 @@
+# Worker pool configuration
+# 本系统（openclaw_teamlab）独立运行，作为 C-Si 专属 OpenClaw (port 10300) 的数据后端。
+# 不再作为宿主机 openclaw (port 10001) 的 Installed Skill。
+# Workers 为 MCP Server 提供后台任务处理能力。
+worker_pool:
+  min_workers: 3
+  max_workers: 20
+  port_range: [10310, 10329]
+  health_check_interval: 15
+  unhealthy_threshold: 3
+  auto_scale_busy_pct: 0.8
+  task_timeout: 300
+  idle_scale_down_after: 300
+
+# Intent routing: patterns → skill mapping
+# 用于 /api/chat 异步任务及 Worker 调度。OpenClaw/飞书可将消息提交到此接口，由 Worker 池并发处理。
+intent_routing:
+  default_skill: pi_agent
+  rules:
+    - patterns: ["多少用户", "多少人", "多少成员", "多少学生", "几个成员", "几个学生", "几个用户", "人数", "成员数", "用户数", "总共有", "共有多少", "有多少人", "有几个", "团队人数", "团队规模", "有多少学生", "有多少成员"]
+      skill: pi_agent
+    - patterns: ["跟谁合作", "和谁合作", "与谁合作", "谁合作最好", "合作推荐", "合作对象", "最佳搭档"]
+      skill: pi_agent
+    - patterns: ["研究方向是什么", "的研究方向", "研究什么", "做什么研究", "研究领域"]
+      skill: pi_agent
+    - patterns: ["有哪些项目", "有什么项目", "项目列表", "项目有哪些", "课题列表"]
+      skill: pi_agent
+    - patterns: ["进展", "progress", "进度", "状态", "radar", "雷达", "能力", "成长", "growth"]
+      skill: student_progress
+    - patterns: ["合作", "collaborate", "配合", "搭档", "互补", "team up", "pair"]
+      skill: collaboration_recommend
+    - patterns: ["指导", "建议", "guidance", "mentor", "发展计划", "怎么帮", "advice"]
+      skill: individual_guidance
+    - patterns: ["对比团队", "其他课题组", "benchmark", "类似团队", "compare", "对标"]
+      skill: team_survey
+    - patterns: ["新方向", "方向", "direction", "研究机会", "该研究什么", "combine", "排列组合"]
+      skill: direction_discovery
+    - patterns: ["文献", "综述", "literature", "review", "论文", "related work", "survey"]
+      skill: literature_review
+    - patterns: ["写作", "润色", "write", "draft", "摘要", "abstract", "论文写作"]
+      skill: academic_writing
+    - patterns: ["会议", "meeting", "笔记", "纪要", "action item", "总结讨论"]
+      skill: meeting_record
+    - patterns: ["全球热点", "全球最新", "arxiv", "最新论文", "全球前沿", "国际前沿", "全球研究", "全球趋势"]
+      skill: pi_agent
+    - patterns: ["跨项目", "项目合作", "项目协同", "项目互补", "多项目", "不同项目之间"]
+      skill: pi_agent
+    - patterns: ["趋势", "trend", "最新", "前沿", "emerging", "热点"]
+      skill: research_trend
+    - patterns: ["风险", "risk", "预警", "谁需要关注", "关注谁", "谁有问题", "团队状态", "团队健康"]
+      skill: pi_agent
+    - patterns: ["成长故事", "成长报告", "发展历程", "成长叙事", "narrative", "growth story"]
+      skill: pi_agent
+    - patterns: ["待办", "跟进", "action", "follow up", "过期", "stale", "任务追踪"]
+      skill: pi_agent
+    - patterns: ["系统状态", "系统健康", "运行报告", "改进建议", "进化报告", "系统怎么样"]
+      skill: pi_agent
+    - patterns: ["了解更多", "有哪些记录", "知道什么", "积累了什么", "历史记录", "记忆"]
+      skill: pi_agent
+
+# Scheduler jobs
+scheduler:
+  jobs:
+    - id: trend_scan
+      cron: "0 6 * * *"
+      skill: research_trend
+      description: "Daily arxiv/Semantic Scholar trend scan"
+    - id: digest_generate
+      cron: "0 7 * * *"
+      skill: email_digest
+      description: "Daily email digest (only if new content)"
+    - id: collab_refresh
+      cron: "0 3 * * 0"
+      skill: collaboration_recommend
+      description: "Weekly collaboration re-computation"
+    - id: capability_update
+      cron: "0 2 * * *"
+      skill: student_progress
+      description: "Daily capability score auto-update"
+    - id: risk_compute
+      cron: "30 5 * * *"
+      skill: __risk_compute__
+      description: "Daily student risk score computation + alerts"
+    - id: action_reconcile
+      cron: "0 4 * * 1"
+      skill: __action_reconcile__
+      description: "Weekly action item reconciliation"
+    - id: direction_analyze
+      cron: "0 2 * * 1"
+      skill: __research_direction_analyze__
+      description: "Weekly research direction clustering (every Monday 2am)"
+    - id: global_research_scan
+      cron: "0 6 * * *"
+      skill: __global_research_scan__
+      description: "Daily global research hotspot scan from arxiv/Semantic Scholar (6am)"
+    - id: cross_project_analyze
+      cron: "0 3 * * 1"
+      skill: __cross_project_analyze__
+      description: "Weekly cross-project collaboration opportunity analysis (every Monday 3am)"
+    - id: coevo_sync
+      cron: "0 */4 * * *"
+      skill: __coevo_sync__
+      description: "Every 4h: 从 cognalign_coevo_prod 增量同步最新团队数据到知识图谱（会议报告/研究规划/协作推荐/Agent记忆）"
+    - id: librarian
+      cron: "0 1 * * *"
+      skill: __librarian__
+      description: "Daily 1am: 知识管理者从对话历史+CoEvo数据提取团队知识，积累持久记忆"
+    - id: evolver
+      cron: "0 4 * * 1"
+      skill: __evolver__
+      description: "Weekly Monday 4am: 系统进化者综合系统性能+CoEvo团队活跃度，生成双维度进化建议与健康报告"
+
+# Intent routing for global research / cross-project topics
+# ── 全球研究和跨项目协作意图路由 ──────────────────────────────────────────
+# （已在 intent_routing.rules 中追加，此处仅为注释说明）
+# patterns: 全球热点、最新论文、arxiv、跨项目合作 → pi_agent（内置 get_global_research 工具）
+
+# Capability dimensions for radar charts
+capability_dimensions:
+  - name: literature_mastery
+    label: 文献功底
+    category: research
+  - name: experimental_design
+    label: 实验设计
+    category: research
+  - name: data_analysis
+    label: 数据分析
+    category: technical
+  - name: coding_ability
+    label: 编程能力
+    category: technical
+  - name: academic_writing
+    label: 学术写作
+    category: communication
+  - name: presentation
+    label: 汇报表达
+    category: communication
+  - name: innovation
+    label: 创新思维
+    category: research
+  - name: collaboration
+    label: 协作能力
+    category: soft_skill

@@ -1,0 +1,248 @@
+# OpenClaw TeamLab - 技能清单 (Skill Manifest)
+# 所有 AI 技能的注册表，用于路由和调度
+# All AI skills registry for routing and scheduling
+
+version: "1.0"
+updated: "2026-03-13"
+
+skills:
+  # ============================================================
+  # 学生培养类 (Student Development)
+  # ============================================================
+  - name: student_progress
+    display_name: 学生进展追踪
+    description: 追踪和可视化学生科研能力成长，生成雷达图数据和趋势分析
+    category: student_development
+    triggers:
+      - pattern: "学生进展|学生进度|能力评估|成长趋势|雷达图"
+        confidence: 0.9
+      - pattern: "student progress|capability score"
+        confidence: 0.8
+      - intent: "check_student_progress"
+    entry_point: skills/student_progress/scripts/fetch_progress.py
+    requires:
+      - mysql
+    outputs:
+      - radar_chart_data
+      - growth_trend
+      - milestone_summary
+
+  - name: collaboration_recommend
+    display_name: 协作推荐
+    description: 分析学生技能矩阵，计算互补性，推荐最佳科研协作组合
+    category: student_development
+    triggers:
+      - pattern: "协作推荐|组队建议|互补性|合作搭配"
+        confidence: 0.9
+      - pattern: "collaboration|team matching"
+        confidence: 0.8
+      - intent: "recommend_collaboration"
+    entry_point: skills/collaboration_recommend/scripts/match_algorithm.py
+    requires:
+      - mysql
+    outputs:
+      - collaboration_pairs
+      - complementarity_scores
+
+  - name: individual_guidance
+    display_name: 个性化指导
+    description: 根据学生能力画像提供个性化科研发展建议
+    category: student_development
+    triggers:
+      - pattern: "个性化指导|发展建议|培养方案|指导意见"
+        confidence: 0.9
+      - pattern: "guidance|development plan"
+        confidence: 0.8
+      - intent: "provide_guidance"
+    entry_point: skills/individual_guidance/SKILL.md
+    requires:
+      - mysql
+      - student_progress
+    outputs:
+      - guidance_report
+
+  # ============================================================
+  # 科研方向类 (Research Direction)
+  # ============================================================
+  - name: team_survey
+    display_name: 团队调研
+    description: 调研全球同类科研团队，对比发表指标，发现优势与差距
+    category: research_direction
+    triggers:
+      - pattern: "团队调研|竞争分析|同行对比|团队对标"
+        confidence: 0.9
+      - pattern: "team survey|competitor analysis"
+        confidence: 0.8
+      - intent: "survey_teams"
+    entry_point: skills/team_survey/scripts/arxiv_team_scan.py
+    requires:
+      - arxiv_api
+      - semantic_scholar_api
+    outputs:
+      - team_comparison
+      - strategic_suggestions
+
+  - name: direction_discovery
+    display_name: 方向发现
+    description: 从会议记录中提取主题，组合排列评估潜力，发现新科研方向
+    category: research_direction
+    triggers:
+      - pattern: "方向发现|新方向|研究方向|主题组合|交叉创新"
+        confidence: 0.9
+      - pattern: "research direction|topic discovery"
+        confidence: 0.8
+      - intent: "discover_directions"
+    entry_point: skills/direction_discovery/scripts/topic_combiner.py
+    requires:
+      - mysql
+      - arxiv_api
+    outputs:
+      - ranked_directions
+      - evidence_links
+
+  - name: research_trend
+    display_name: 科研趋势监控
+    description: 每日扫描 arXiv 等平台，监控团队相关领域的最新论文和趋势
+    category: research_direction
+    triggers:
+      - pattern: "科研趋势|最新论文|领域动态|前沿追踪"
+        confidence: 0.9
+      - pattern: "research trend|latest papers"
+        confidence: 0.8
+      - intent: "monitor_trends"
+      - schedule: "0 6 * * *"  # 每天早上6点
+    entry_point: skills/research_trend/scripts/scan_arxiv_daily.py
+    requires:
+      - arxiv_api
+    outputs:
+      - daily_paper_list
+      - relevance_scores
+
+  # ============================================================
+  # 学术写作类 (Academic Writing)
+  # ============================================================
+  - name: literature_review
+    display_name: 文献综述
+    description: 系统性文献检索、筛选、分析和综述撰写
+    category: academic_writing
+    triggers:
+      - pattern: "文献综述|文献检索|文献分析|相关工作"
+        confidence: 0.9
+      - pattern: "literature review|related work"
+        confidence: 0.8
+      - intent: "literature_review"
+    entry_point: skills/literature_review/SKILL.md
+    requires:
+      - arxiv_api
+      - semantic_scholar_api
+    outputs:
+      - review_document
+      - citation_list
+
+  - name: academic_writing
+    display_name: 学术写作
+    description: 辅助学术论文撰写，包括结构优化、语言润色、逻辑梳理
+    category: academic_writing
+    triggers:
+      - pattern: "学术写作|论文润色|写作辅助|论文修改"
+        confidence: 0.9
+      - pattern: "academic writing|paper editing"
+        confidence: 0.8
+      - intent: "academic_writing"
+    entry_point: skills/academic_writing/SKILL.md
+    requires: []
+    outputs:
+      - revised_text
+      - writing_suggestions
+
+  # ============================================================
+  # 会议管理类 (Meeting Management)
+  # ============================================================
+  - name: meeting_record
+    display_name: 会议记录
+    description: 会议记录整理、摘要生成、行动项提取
+    category: meeting_management
+    triggers:
+      - pattern: "会议记录|会议纪要|会议总结|行动项"
+        confidence: 0.9
+      - pattern: "meeting notes|meeting summary|action items"
+        confidence: 0.8
+      - intent: "summarize_meeting"
+    entry_point: skills/meeting_record/scripts/summarize_meeting.py
+    requires:
+      - mysql
+    outputs:
+      - meeting_summary
+      - action_items
+
+  # ============================================================
+  # 通知推送类 (Notification)
+  # ============================================================
+  - name: email_digest
+    display_name: 邮件摘要
+    description: 编写和发送每日科研动态摘要邮件
+    category: notification
+    triggers:
+      - pattern: "邮件摘要|日报|周报|动态推送"
+        confidence: 0.9
+      - pattern: "email digest|daily report"
+        confidence: 0.8
+      - intent: "send_digest"
+      - schedule: "0 8 * * 1-5"  # 工作日早上8点
+    entry_point: skills/email_digest/scripts/compose_digest.py
+    requires:
+      - smtp
+      - research_trend
+    outputs:
+      - email_html
+      - send_status
+
+  # ============================================================
+  # 平台交互类 (Platform Interaction)
+  # ============================================================
+  - name: feishu_interaction
+    display_name: 飞书交互
+    description: 处理飞书消息，识别用户意图，路由到对应技能
+    category: platform_interaction
+    triggers:
+      - pattern: "__feishu_message__"
+        confidence: 1.0
+      - intent: "feishu_message"
+    entry_point: skills/feishu_interaction/scripts/intent_classifier.py
+    requires:
+      - feishu_api
+    outputs:
+      - classified_intent
+      - routed_skill
+
+# 技能依赖图 (Skill Dependency Graph)
+dependencies:
+  email_digest:
+    - research_trend
+  individual_guidance:
+    - student_progress
+  collaboration_recommend:
+    - student_progress
+  direction_discovery:
+    - meeting_record
+
+# 类别说明 (Category Descriptions)
+categories:
+  student_development:
+    display_name: 学生培养
+    description: 学生科研能力追踪、指导和协作管理
+  research_direction:
+    display_name: 科研方向
+    description: 科研趋势监控、方向发现和团队对标
+  academic_writing:
+    display_name: 学术写作
+    description: 文献综述和论文撰写辅助
+  meeting_management:
+    display_name: 会议管理
+    description: 会议记录和行动项追踪
+  notification:
+    display_name: 通知推送
+    description: 邮件摘要和信息推送
+  platform_interaction:
+    display_name: 平台交互
+    description: 飞书等平台消息处理和意图路由

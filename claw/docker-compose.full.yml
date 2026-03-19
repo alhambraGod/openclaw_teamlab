@@ -1,0 +1,121 @@
+# ============================================================
+# 模式2：全容器部署，所有服务统一在 Docker 中运行
+# 使用方式：cd claw && make up-full
+# ============================================================
+#
+# 端口分配（10300-10399 段，与模式1完全一致）：
+#   10300 → OpenClaw Gateway UI
+#   10301 → TeamLab FastAPI（容器对外）
+#   10302 → Scheduler（容器对外）
+#   10310-10312 → Worker 池（容器内，不对外暴露）
+#
+# 通信方式：
+#   claw-openclaw Agent 通过 bash+curl 调用 claw-teamlab
+#   HTTP 接口（/api/agent/*），容器间通过 claw-net 网络互通。
+#
+# 日志、数据库、配置文件路径与模式1保持完全一致：
+#   日志：/Users/antonio/openclaws/openclaw_teamlab/data/logs/
+#   DB：MySQL 10.100.81.177（外部，无变化）
+#   配置：.env / config/ / workspace/ 原地挂载
+
+services:
+
+  # ── C-Si TeamLab 专属 OpenClaw ─────────────────────────────────────────
+  claw-openclaw:
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+    container_name: claw-openclaw
+    entrypoint: ["/opt/entrypoint-wrapper.sh"]
+    command: ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
+    ports:
+      - "10300:10300"
+    volumes:
+      # 项目专属配置（openclaw.json、agents/、feishu/ 等），隔离于宿主机 ~/.openclaw
+      - ./config:/home/node/.openclaw
+      # Installed Skills：挂载到 skills/ 专用路径，UI 中显示为 INSTALLED SKILLS
+      - ./skills:/home/node/.openclaw/skills
+      # 项目专属工作区（AGENTS.md、IDENTITY.md、TEAMLAB_API.md 等上下文文档）
+      - ./workspace:/home/node/.openclaw/workspace
+      # 运行时数据（sessions 日志等），使用 Docker named volume 持久化
+      - claw-openclaw-data:/home/node/.openclaw/data
+      # TCP 代理脚本：将容器内 127.0.0.1:10301 转发到 claw-teamlab:10301
+      - ./scripts/teamlab-proxy.mjs:/opt/teamlab-proxy.mjs:ro
+      - ./scripts/entrypoint-wrapper.sh:/opt/entrypoint-wrapper.sh:ro
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      TZ: Asia/Shanghai
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      # 全容器模式：通过 claw-net 容器间网络直连，不走宿主机
+      TEAMLAB_BASE_URL: http://claw-teamlab:10301
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      claw-teamlab:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD", "node", "-e",
+          "fetch('http://127.0.0.1:10300/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "30"
+        tag: "claw-openclaw"
+    networks:
+      - claw-net
+
+  # ── TeamLab 数据后端（FastAPI + Scheduler + Workers）─────────────────
+  claw-teamlab:
+    build:
+      context: /Users/antonio/openclaws/openclaw_teamlab
+      dockerfile: Dockerfile.teamlab
+    image: claw-teamlab:latest
+    container_name: claw-teamlab
+    working_dir: /app
+    command: ["python", "main.py", "all"]
+    ports:
+      - "10301:10301"     # FastAPI Gateway（对外开放）
+      - "10302:10302"     # Scheduler（对外开放，供状态查询）
+    volumes:
+      # 源码热挂载（代码修改无需 rebuild，只需 restart）
+      - /Users/antonio/openclaws/openclaw_teamlab:/app
+    env_file:
+      - /Users/antonio/openclaws/openclaw_teamlab/.env
+    environment:
+      REDIS_HOST: host.docker.internal
+      LOG_DIR: /app/data/logs
+      PID_DIR: /tmp/teamlab_pids
+      TZ: Asia/Shanghai
+      PYTHONUNBUFFERED: "1"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://localhost:10301/api/system/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "30"
+        tag: "claw-teamlab"
+    networks:
+      - claw-net
+
+networks:
+  claw-net:
+    driver: bridge
+
+volumes:
+  claw-openclaw-data:

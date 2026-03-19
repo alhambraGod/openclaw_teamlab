@@ -1,0 +1,38 @@
+# Dockerfile for claw-teamlab (TeamLab FastAPI + Scheduler + Workers)
+# Build context: /Users/antonio/openclaws/openclaw_teamlab
+#
+# 构建方式：cd claw && docker compose -f docker-compose.full.yml build claw-teamlab
+# 依赖安装在镜像内，启动快速（无需每次 pip install）
+# 源码通过 volume 热挂载，代码修改无需 rebuild
+
+FROM python:3.12-slim
+
+# 系统依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    pkg-config \
+    default-libmysqlclient-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# 先复制依赖文件（利用 Docker layer 缓存，只在 requirements.txt 变化时重新安装）
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 预 COPY 源码（volume 挂载时会被覆盖，用于无 volume 的 CI/生产场景）
+COPY . /app/
+
+# 运行时环境变量（可被 docker-compose environment 块覆盖）
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV LOG_DIR=/app/data/logs
+ENV PID_DIR=/app/data/pids
+
+# 确保日志和 PID 目录存在
+RUN mkdir -p /app/data/logs /app/data/pids
+
+EXPOSE 10301 10302
+
+CMD ["python", "main.py", "all"]
